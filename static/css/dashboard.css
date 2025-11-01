@@ -71,11 +71,13 @@ body {
     transform: translateY(0);
   }
 }
+
 .header,
 .stats-grid > .stat-card,
 .main-grid > section {
   animation: fadeInUp 0.6s ease-out backwards;
 }
+
 .stat-card {
   animation-delay: calc(var(--index) * 0.1s);
 }
@@ -84,11 +86,7 @@ body {
 .liquid-button {
   position: relative;
   padding: 10px 20px;
-  background: linear-gradient(
-    135deg,
-    var(--primary-purple),
-    var(--deep-purple)
-  );
+  background: linear-gradient(135deg, var(--primary-purple), var(--deep-purple));
   border: none;
   border-radius: 50px;
   color: white;
@@ -101,19 +99,23 @@ body {
   align-items: center;
   gap: 8px;
 }
+
 .liquid-button:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 20px var(--shadow-color), 0 0 30px var(--glow-purple);
 }
+
 .liquid-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
+
 .liquid-button.success {
   background: linear-gradient(135deg, #10b981, #059669);
 }
+
 .liquid-button.danger {
   background: linear-gradient(135deg, #ef4444, #dc2626);
 }
@@ -122,6 +124,7 @@ body {
 .header {
   margin-bottom: 25px;
 }
+
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -129,6 +132,7 @@ body {
   flex-wrap: wrap;
   gap: 20px;
 }
+
 .logo-section h1 {
   font-size: 1.6rem;
   font-weight: 700;
@@ -137,9 +141,11 @@ body {
   align-items: center;
   gap: 12px;
 }
+
 .logo-section i {
   color: var(--primary-purple);
 }
+
 .controls-section {
   display: flex;
   align-items: center;
@@ -154,9 +160,11 @@ body {
   border-radius: 50px;
   cursor: pointer;
 }
+
 .theme-toggle.dark {
   background: var(--primary-purple);
 }
+
 .theme-toggle-slider {
   position: absolute;
   top: 3px;
@@ -167,9 +175,11 @@ body {
   border-radius: 50%;
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
+
 .theme-toggle.dark .theme-toggle-slider {
   transform: translateX(30px);
 }
+
 .theme-icon {
   position: absolute;
   top: 50%;
@@ -178,15 +188,19 @@ body {
   color: white;
   transition: opacity 0.3s ease;
 }
+
 .sun-icon {
   left: 8px;
 }
+
 .moon-icon {
   right: 8px;
 }
+
 .theme-toggle.dark .sun-icon {
   opacity: 0;
 }
+
 .theme-toggle:not(.dark) .moon-icon {
   opacity: 0;
 }
@@ -197,15 +211,18 @@ body {
   gap: 8px;
   font-size: 0.9rem;
 }
+
 .status-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   transition: background-color 0.3s ease;
 }
+
 .status-dot.offline {
   background: #6b7280;
 }
+
 .status-dot.online {
   background: #10b981;
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
@@ -218,11 +235,13 @@ body {
   gap: 25px;
   margin-bottom: 25px;
 }
+
 .main-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 25px;
 }
+
 @media (max-width: 1024px) {
   .main-grid {
     grid-template-columns: 1fr;
@@ -235,15 +254,18 @@ body {
   align-items: center;
   justify-content: space-between;
 }
+
 .stat-icon {
   font-size: 24px;
   color: var(--primary-purple);
 }
+
 .stat-content h3 {
   font-size: 2.2rem;
   font-weight: 700;
   color: var(--text-primary);
 }
+
 .stat-content p {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -255,6 +277,7 @@ body {
   align-items: center;
   margin-bottom: 20px;
 }
+
 .section-title {
   font-size: 1.2rem;
   font-weight: 600;
@@ -262,6 +285,7 @@ body {
   align-items: center;
   gap: 10px;
 }
+
 .section-title i {
   color: var(--primary-purple);
 }
@@ -284,6 +308,7 @@ body {
   flex-direction: column;
   align-items: center;
 }
+
 .feed-placeholder i {
   font-size: 48px;
   color: var(--primary-purple);
@@ -306,12 +331,15 @@ body {
   overflow-y: auto;
   padding-right: 8px;
 }
+
 .scrollable-list::-webkit-scrollbar {
   width: 4px;
 }
+
 .scrollable-list::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .scrollable-list::-webkit-scrollbar-thumb {
   background: var(--primary-purple);
   border-radius: 10px;
@@ -324,14 +352,17 @@ body {
   border-bottom: 1px solid var(--glass-border);
   font-size: 0.9rem;
 }
+
 .item-info strong {
   color: var(--text-primary);
   margin-bottom: 4px;
 }
+
 .item-info small {
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
+
 .item-badge {
   background: var(--glass-bg);
   padding: 4px 10px;
@@ -349,6 +380,7 @@ body {
   animation: fadeIn 0.3s ease;
   padding: 2%;
 }
+
 .modal-content {
   position: relative;
   margin: 2% auto;
@@ -359,6 +391,7 @@ body {
   display: flex;
   flex-direction: column;
 }
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -367,6 +400,7 @@ body {
     opacity: 1;
   }
 }
+
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -388,12 +422,14 @@ body {
 .modal-header h2 {
   color: var(--text-primary);
 }
+
 .close-modal {
   font-size: 24px;
   cursor: pointer;
   color: var(--text-secondary);
   transition: transform 0.3s ease;
 }
+
 .close-modal:hover {
   transform: rotate(90deg);
   color: var(--primary-purple);
@@ -447,6 +483,7 @@ body {
 .form-group {
   margin-bottom: 20px;
 }
+
 .form-input {
   width: 100%;
   padding: 12px;
@@ -456,11 +493,13 @@ body {
   color: var(--text-primary);
   font-size: 1rem;
 }
+
 .form-input:focus {
   outline: none;
   border-color: var(--primary-purple);
   box-shadow: 0 0 15px var(--glow-purple);
 }
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -479,6 +518,7 @@ body {
   flex-grow: 1;
   min-height: 300px;
 }
+
 .camera-preview-box video,
 .camera-preview-box canvas {
   position: absolute;
@@ -487,45 +527,48 @@ body {
   height: 100%;
   object-fit: cover;
 }
+
 #videoPreview {
   transform: scaleX(-1);
 }
+
 #photoCanvas {
   display: none;
 }
 
-/* === UPDATED RECOGNITION OVERLAY STYLES - BOTTOM NOTIFICATION === */
+/* === BOTTOM LEFT NOTIFICATION BOX === */
 .recognition-overlay {
   position: absolute;
-  bottom: 80px;
-  left: 24px;
+  bottom: 20px;
+  left: 20px;
   
-  padding: 14px 24px;
-  background: rgba(24, 24, 24, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(42, 42, 42, 0.6);
-  border-radius: 12px;
+  padding: 12px 20px;
+  background: rgba(88, 80, 236, 0.95);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(139, 92, 246, 0.6);
+  border-radius: 8px;
   
-  color: #EFEFEF;
+  color: white;
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-family: 'Montserrat', sans-serif;
   
   opacity: 0;
   visibility: hidden;
+  transform: translateY(10px);
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   z-index: 10;
   
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
   
   display: flex;
   align-items: center;
   gap: 10px;
+  max-width: 400px;
 }
 
 .recognition-overlay::before {
-  content: '🔔';
   font-size: 16px;
   display: inline-block;
 }
@@ -533,14 +576,14 @@ body {
 .recognition-overlay.show {
   opacity: 1;
   visibility: visible;
-  bottom: 90px;
+  transform: translateY(0);
 }
 
 /* Success State - Green notification */
 .recognition-overlay.success {
-  background: rgba(22, 163, 74, 0.9);
-  border-color: rgba(34, 197, 94, 0.5);
-  box-shadow: 0 8px 32px rgba(22, 163, 74, 0.4);
+  background: rgba(16, 185, 129, 0.95);
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .recognition-overlay.success::before {
@@ -551,9 +594,9 @@ body {
 
 /* Error State - Red notification */
 .recognition-overlay.error {
-  background: rgba(220, 38, 38, 0.9);
-  border-color: rgba(239, 68, 68, 0.5);
-  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.4);
+  background: rgba(239, 68, 68, 0.95);
+  border-color: rgba(255, 69, 69, 0.6);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 .recognition-overlay.error::before {
@@ -564,23 +607,23 @@ body {
 
 /* Recognizing State - Purple notification with subtle animation */
 .recognition-overlay.recognizing {
-  background: rgba(139, 92, 246, 0.9);
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4);
-  animation: recognizingGlow 2s ease-in-out infinite;
+  background: rgba(88, 80, 236, 0.95);
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
+  animation: recognizingPulse 2s ease-in-out infinite;
 }
 
 .recognition-overlay.recognizing::before {
-  content: '👤';
+  content: '⏳';
   font-size: 16px;
 }
 
-@keyframes recognizingGlow {
+@keyframes recognizingPulse {
   0%, 100% { 
-    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.4);
+    box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
   }
   50% { 
-    box-shadow: 0 8px 40px rgba(139, 92, 246, 0.6);
+    box-shadow: 0 6px 16px rgba(88, 80, 236, 0.6);
   }
 }
 
@@ -671,13 +714,11 @@ body {
   
   .recognition-overlay {
     font-size: 0.85rem;
-    padding: 12px 18px;
-    bottom: 70px !important;
-    left: 16px !important;
-  }
-  
-  .recognition-overlay.show {
-    bottom: 80px !important;
+    padding: 10px 16px;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: calc(100% - 32px);
   }
   
   .recognition-overlay::before {

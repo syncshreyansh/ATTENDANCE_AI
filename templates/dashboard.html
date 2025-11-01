@@ -308,16 +308,17 @@
             z-index: 5;
         }
 
+        /* --- MODIFIED RECOGNITION OVERLAY --- */
         .recognition-overlay {
             position: absolute;
             bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 20px; /* <-- Positioned to the left */
+            /* transform: translateX(-50%); */ /* <-- Removed center transform */
             padding: 10px 20px;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(5px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50px;
+            border-radius: 12px; /* <-- Matched target image style */
             color: white;
             font-weight: 600;
             font-size: 0.9rem;
@@ -325,6 +326,16 @@
             visibility: hidden;
             transition: all 0.3s ease-out;
             z-index: 5;
+            display: flex; /* <-- Added for icon alignment */
+            align-items: center; /* <-- Added for icon alignment */
+        }
+        
+        /* This new rule adds the icon */
+        .recognition-overlay::before {
+            content: '🔔';
+            font-size: 16px;
+            margin-right: 10px;
+            display: inline-block;
         }
 
         .recognition-overlay.show {
@@ -338,18 +349,36 @@
             border-color: rgba(16, 185, 129, 1);
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
         }
+        
+        .recognition-overlay.success::before {
+            content: '✓'; /* Success icon */
+        }
 
         .recognition-overlay.error {
             background: rgba(239, 68, 68, 0.7);
             border-color: rgba(239, 68, 68, 1);
             box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
         }
+        
+        .recognition-overlay.error::before {
+            content: '✗'; /* Error icon */
+        }
 
         .recognition-overlay.recognizing {
-            background: rgba(139, 92, 246, 0.7);
-            border-color: rgba(139, 92, 246, 1);
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+            /* Purple background is removed to keep the dark theme */
+            /* background: rgba(139, 92, 246, 0.7); */
+            
+            /* Keep a subtle glow using the theme's accent color */
+            border-color: var(--color-accent); 
+            box-shadow: 0 0 20px var(--color-accent-glow);
         }
+        
+        /* This new rule changes the icon during recognition */
+        .recognition-overlay.recognizing::before {
+            content: '👤'; /* Person icon */
+        }
+        /* --- END OF MODIFICATIONS --- */
+
 
         /* --- Stats Grid --- */
         .stats-grid {
