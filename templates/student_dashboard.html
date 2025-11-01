@@ -21,6 +21,9 @@
             --color-accent-strong-glow: rgba(0, 224, 240, 0.4);
             --color-status-green: #16A34A;
             --color-status-red: #FF4545;
+            --color-gold: #FFD700;
+            --color-silver: #C0C0C0;
+            --color-bronze: #CD7F32;
             --color-text-primary: #EFEFEF;
             --color-text-secondary: #AAAAAA;
             --font-heading: 'Montserrat', sans-serif;
@@ -153,7 +156,7 @@
             box-shadow: 0 0 30px var(--color-accent-strong-glow);
         }
 
-        /* --- Profile Card --- */
+        /* --- Profile Card with Photo --- */
         .user-profile {
             display: flex;
             align-items: center;
@@ -171,6 +174,24 @@
             font-size: 32px;
             color: #000;
             font-weight: 700;
+            overflow: hidden;
+            position: relative;
+            border: 3px solid var(--color-accent);
+            box-shadow: 0 0 20px var(--color-accent-glow);
+        }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .profile-avatar-text {
+            position: relative;
+            z-index: 1;
         }
 
         .profile-info h2 {
@@ -263,6 +284,12 @@
             color: var(--color-accent);
         }
 
+        .card-header .subtitle {
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            font-weight: 400;
+        }
+
         /* --- Chart --- */
         .chart-container {
             position: relative;
@@ -307,35 +334,161 @@
             color: var(--color-accent);
         }
 
-        /* --- Event List --- */
-        .event-log-list {
+        /* --- Leaderboard Styles --- */
+        .leaderboard-list {
             list-style: none;
-            font-family: var(--font-mono);
-            font-size: 14px;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
+            overflow-x: hidden; /* FIXED: Prevent horizontal scrolling */
         }
 
-        .event-log-list li {
-            padding: 12px 0;
-            color: var(--color-text-primary);
-            border-bottom: 1px solid rgba(0, 224, 240, 0.1);
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 224, 240, 0.1);
+            transition: all 0.3s ease;
+            min-width: 0; /* FIXED: Prevent overflow */
         }
 
-        .event-log-list li:last-child {
-            border-bottom: none;
+        .leaderboard-item:hover {
+            border-color: var(--color-accent);
+            background: rgba(0, 224, 240, 0.05);
+            transform: scale(1.02); /* CHANGED: Scale instead of translateX */
         }
 
-        .event-log-list .date {
-            color: var(--color-accent);
-            font-weight: 600;
-            display: block;
-            margin-bottom: 4px;
+        .leaderboard-item.current-user {
+            border: 2px solid var(--color-accent);
+            background: rgba(0, 224, 240, 0.1);
+            box-shadow: 0 0 20px var(--color-accent-glow);
         }
 
-        .event-log-list .details {
+        /* NEW: Profile Picture Container with Medal */
+        .leaderboard-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 16px;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid rgba(0, 224, 240, 0.3);
+            background: linear-gradient(135deg, var(--color-accent), #00c8d8);
+        }
+
+        .leaderboard-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .leaderboard-avatar-text {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #000;
+        }
+
+        /* Medal Overlay on Avatar */
+        .medal-overlay {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 2;
+            border: 2px solid var(--color-bg);
+        }
+
+        .medal-overlay.gold {
+            background: var(--color-gold);
+        }
+
+        .medal-overlay.silver {
+            background: var(--color-silver);
+        }
+
+        .medal-overlay.bronze {
+            background: var(--color-bronze);
+        }
+
+        .rank-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 16px;
+            flex-shrink: 0;
+        }
+
+        .rank-badge.rank-1 {
+            background: linear-gradient(135deg, var(--color-gold), #FFA500);
+            color: #000;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .rank-badge.rank-2 {
+            background: linear-gradient(135deg, var(--color-silver), #A8A8A8);
+            color: #000;
+            box-shadow: 0 0 20px rgba(192, 192, 192, 0.5);
+        }
+
+        .rank-badge.rank-3 {
+            background: linear-gradient(135deg, var(--color-bronze), #8B4513);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(205, 127, 50, 0.5);
+        }
+
+        .rank-badge.rank-other {
+            background: rgba(24, 24, 24, 0.7);
+            border: 1px solid rgba(0, 224, 240, 0.3);
             color: var(--color-text-secondary);
+        }
+
+        .leaderboard-info {
+            flex: 1;
+            min-width: 0; /* FIXED: Allow text truncation */
+        }
+
+        .leaderboard-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap; /* FIXED: Prevent text wrapping */
+            overflow: hidden; /* FIXED: Hide overflow text */
+            text-overflow: ellipsis; /* FIXED: Add ... for long names */
+        }
+
+        .leaderboard-stats {
             font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            white-space: nowrap; /* FIXED: Prevent wrapping */
+        }
+
+        .leaderboard-rate {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--color-accent);
+            margin-left: 16px;
+            padding-left: 16px;
+            flex-shrink: 0; /* FIXED: Keep rate visible */
         }
 
         /* --- Responsive --- */
@@ -387,7 +540,9 @@
 
     <main class="dashboard-container">
         <div class="card user-profile">
-            <div class="profile-avatar" id="profileAvatar">...</div>
+            <div class="profile-avatar" id="profileAvatar">
+                <span class="profile-avatar-text">...</span>
+            </div>
             <div class="profile-info">
                 <h2 id="studentName">Loading...</h2>
                 <p>Student ID: <span id="studentId">---</span> | Class: <span id="studentClass">---</span></p>
@@ -438,10 +593,13 @@
 
         <section class="card">
             <div class="card-header">
-                <h2><i class="fa-solid fa-history"></i> Recent Attendance</h2>
+                <div>
+                    <h2><i class="fa-solid fa-trophy"></i> Class Leaderboard</h2>
+                    <p class="subtitle" id="classInfo">Loading...</p>
+                </div>
             </div>
-            <ul class="event-log-list" id="recentAttendance">
-                <li style="text-align: center; color: var(--color-text-secondary)">Loading...</li>
+            <ul class="leaderboard-list" id="leaderboardList">
+                <li style="text-align: center; color: var(--color-text-secondary); padding: 20px;">Loading...</li>
             </ul>
         </section>
     </main>
@@ -499,9 +657,25 @@
                     document.getElementById('studentClass').textContent = `${student.class}-${student.section}`;
                     document.getElementById('studentPoints').textContent = student.points || 0;
                     
-                    if (student.name) {
-                        const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
-                        document.getElementById('profileAvatar').textContent = initials;
+                    // Display photo if available, otherwise show initials
+                    const avatarEl = document.getElementById('profileAvatar');
+                    const avatarText = avatarEl.querySelector('.profile-avatar-text');
+                    
+                    if (student.image_path) {
+                        const img = document.createElement('img');
+                        img.src = '/' + student.image_path;
+                        img.alt = student.name;
+                        img.onerror = function() {
+                            console.warn('Failed to load image, showing initials');
+                            avatarText.textContent = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                        };
+                        avatarEl.appendChild(img);
+                        avatarText.style.display = 'none';
+                    } else {
+                        if (student.name) {
+                            const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                            avatarText.textContent = initials;
+                        }
                     }
                 }
                 
@@ -521,44 +695,87 @@
                     document.getElementById('currentStreak').textContent = statsData.streak || 0;
                 }
                 
-                await loadAttendanceHistory();
                 await loadCalendar();
                 await loadChart();
+                await loadClassLeaderboard();
                 
             } catch (error) {
                 console.error('Error loading student data:', error);
             }
         }
         
-        async function loadAttendanceHistory() {
-            const response = await fetch(`/api/student-attendance/${user.student_id}`, {
+        async function loadClassLeaderboard() {
+            const response = await fetch('/api/class-leaderboard', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            if (!response.ok) {
-                 console.error('Failed to load attendance history');
-                 return;
-            }
-            const data = await response.json();
             
-            const listEl = document.getElementById('recentAttendance');
+            if (!response.ok) {
+                console.error('Failed to load leaderboard');
+                return;
+            }
+            
+            const data = await response.json();
+            const listEl = document.getElementById('leaderboardList');
             listEl.innerHTML = '';
             
-            if (data.attendance && data.attendance.length > 0) {
-                data.attendance.forEach(record => {
+            if (data.success && data.leaderboard && data.leaderboard.length > 0) {
+                document.getElementById('classInfo').textContent = `Class ${data.class}`;
+                
+                data.leaderboard.forEach(student => {
                     const item = document.createElement('li');
-                    const recordDate = new Date(record.date).toLocaleDateString(undefined, {
-                        year: 'numeric', month: 'long', day: 'numeric'
-                    });
+                    item.className = 'leaderboard-item';
+                    if (student.is_current_user) {
+                        item.classList.add('current-user');
+                    }
+                    
+                    let rankClass = 'rank-other';
+                    let rankIcon = student.rank;
+                    let medalHtml = '';
+                    
+                    if (student.rank === 1) {
+                        rankClass = 'rank-1';
+                        rankIcon = '🥇';
+                        medalHtml = '<div class="medal-overlay gold">🥇</div>';
+                    } else if (student.rank === 2) {
+                        rankClass = 'rank-2';
+                        rankIcon = '🥈';
+                        medalHtml = '<div class="medal-overlay silver">🥈</div>';
+                    } else if (student.rank === 3) {
+                        rankClass = 'rank-3';
+                        rankIcon = '🥉';
+                        medalHtml = '<div class="medal-overlay bronze">🥉</div>';
+                    }
+                    
+                    // Generate initials for fallback
+                    const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                    
+                    // Profile picture HTML
+                    let avatarContent = '';
+                    if (student.image_path) {
+                        avatarContent = `<img src="/${student.image_path}" alt="${student.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="leaderboard-avatar-text" style="display: none;">${initials}</div>`;
+                    } else {
+                        avatarContent = `<div class="leaderboard-avatar-text">${initials}</div>`;
+                    }
+                    
                     item.innerHTML = `
-                        <span class="date">${recordDate}</span>
-                        <span class="details">${record.status} - ${record.time_in || 'N/A'} | +${record.points_earned} pts</span>
+                        <div class="rank-badge ${rankClass}">${rankIcon}</div>
+                        <div class="leaderboard-avatar">
+                            ${avatarContent}
+                            ${medalHtml}
+                        </div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${student.name}${student.is_current_user ? ' (You)' : ''}</div>
+                            <div class="leaderboard-stats">${student.days_present}/${student.total_days} days • ${student.points} points</div>
+                        </div>
+                        <div class="leaderboard-rate">${student.attendance_rate}%</div>
                     `;
                     listEl.appendChild(item);
                 });
             } else {
-                listEl.innerHTML = '<li style="text-align: center; color: var(--color-text-secondary)">No attendance records</li>';
+                listEl.innerHTML = '<li style="text-align: center; color: var(--color-text-secondary); padding: 20px;">No classmates found</li>';
             }
         }
         
