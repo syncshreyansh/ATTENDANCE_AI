@@ -1,315 +1,281 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Attendance - Student Dashboard</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
-        /* --- [START] ADDED STYLES (from missing dashboard.css) --- */
-        
-        /* 1. Root Variables (Theme) */
+        /* --- CSS Variables --- */
         :root {
-            --primary-purple: #8b5cf6;
-            --deep-purple: #6d28d9;
-            --glow-purple: rgba(139, 92, 246, 0.5);
-            
-            --bg-light: #f3f4f6;
-            --bg-dark: #111827;
-            
-            --card-bg-light: rgba(255, 255, 255, 0.7);
-            --card-border-light: rgba(229, 231, 235, 0.9);
-            
-            --card-bg-dark: rgba(31, 41, 55, 0.7);
-            --card-border-dark: rgba(75, 85, 99, 0.8);
-            
-            --text-primary-light: #1f2937;
-            --text-secondary-light: #4b5563;
-            
-            --text-primary-dark: #f9fafb;
-            --text-secondary-dark: #d1d5db;
-
-            --glass-bg: var(--card-bg-light);
-            --glass-border: var(--card-border-light);
-            --text-primary: var(--text-primary-light);
-            --text-secondary: var(--text-secondary-light);
+            --color-bg: #101010;
+            --color-surface: #181818;
+            --color-border: #2A2A2A;
+            --color-accent: #00E0F0;
+            --color-accent-glow: rgba(0, 224, 240, 0.2);
+            --color-accent-strong-glow: rgba(0, 224, 240, 0.4);
+            --color-status-green: #16A34A;
+            --color-status-red: #FF4545;
+            --color-text-primary: #EFEFEF;
+            --color-text-secondary: #AAAAAA;
+            --font-heading: 'Montserrat', sans-serif;
+            --font-body: 'Montserrat', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
         }
 
-        body.dark-mode {
-            --glass-bg: var(--card-bg-dark);
-            --glass-border: var(--card-border-dark);
-            --text-primary: var(--text-primary-dark);
-            --text-secondary: var(--text-secondary-dark);
-        }
-
-        /* 2. Global Styles */
+        /* --- Global Styles --- */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html, body {
+            height: 100%;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-light);
-            color: var(--text-primary);
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-
-        body.dark-mode {
-            background-color: var(--bg-dark);
-        }
-
-        /* 3. Layout */
-        .dashboard-container {
-            max-width: 1200px;
-            margin: 25px auto;
-            padding: 0 25px;
-            display: grid;
-            gap: 25px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 25px;
-        }
-
-        /* 4. Components */
-        
-        /* Glass Card */
-        .glass-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        }
-        
-        /* Header */
-        .header {
-            padding: 15px 25px;
-        }
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .logo-section h1 {
-            font-size: 1.25rem;
-            color: var(--text-primary);
-        }
-        .logo-section i {
-            color: var(--primary-purple);
-        }
-        .controls-section {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        /* Theme Toggle */
-        .theme-toggle {
-            width: 50px;
-            height: 26px;
-            background: var(--bg-dark);
-            border-radius: 13px;
-            cursor: pointer;
+            font-family: var(--font-body);
+            background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #050505 100%);
+            color: var(--color-text-primary);
+            overflow-x: hidden;
             position: relative;
-            transition: background 0.3s ease;
         }
-        .theme-toggle.dark {
-            background: var(--bg-light);
-        }
-        .theme-toggle-slider {
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            transition: transform 0.3s ease;
-        }
-        .theme-toggle.dark .theme-toggle-slider {
-            transform: translateX(24px);
-            background: var(--bg-dark);
-        }
-        .theme-icon {
-            position: absolute;
-            font-size: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        .sun-icon {
-            left: 6px;
-            color: #f39c12;
-        }
-        .moon-icon {
-            right: 6px;
-            color: #f1c40f;
-        }
-        .theme-toggle.dark .sun-icon { opacity: 0; }
-        .theme-toggle .moon-icon { opacity: 0; }
-        .theme-toggle.dark .moon-icon { opacity: 1; }
 
-        /* Liquid Button (base for logout) */
-        .liquid-button {
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .liquid-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
         }
         
-        /* Stat Card */
-        .stat-card-inner {
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+            opacity: 0.3;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-100px) translateX(100px); }
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-heading);
+            font-weight: 600;
+        }
+
+        /* --- Header --- */
+        .main-header {
+            position: relative;
+            z-index: 10;
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-        .stat-content h3 {
-            font-size: 2rem;
-            color: var(--text-primary);
-            margin-bottom: 4px;
-        }
-        .stat-content p {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-        .stat-icon {
-            font-size: 1.8rem;
-            padding: 12px;
-            border-radius: 50%;
-            background: rgba(139, 92, 246, 0.1);
-            color: var(--primary-purple);
-        }
-        
-        /* Section Title */
-        .section-title {
-            font-size: 1.2rem;
-            color: var(--text-primary);
-            margin-bottom: 10px;
-        }
-        .section-title i {
-            margin-right: 8px;
-            color: var(--text-secondary);
-        }
-        
-        /* Scrollable List */
-        .scrollable-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--glass-border);
-        }
-        .list-item:last-child {
-            border-bottom: none;
-        }
-        .item-info strong {
-            display: block;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-        .item-info small {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-        .item-badge small {
-            font-weight: 600;
-            color: #10b981;
-            background: rgba(16, 185, 129, 0.1);
-            padding: 4px 8px;
-            border-radius: 6px;
-        }
-        
-        /* Responsive */
-        @media (max-width: 900px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        @media (max-width: 600px) {
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-            .header-content {
-                flex-direction: column;
-                gap: 15px;
-            }
+            padding: 20px 40px;
+            background-image: linear-gradient(to bottom, 
+                rgba(16, 16, 16, 1) 0%,
+                rgba(16, 16, 16, 0.7) 60%,
+                transparent 100%
+            );
         }
 
-        /* --- [END] ADDED STYLES --- */
+        .logo-title {
+            font-size: 24px;
+            color: var(--color-text-primary);
+        }
 
-
-        /* --- [START] YOUR ORIGINAL STYLES --- */
-        .user-profile {
+        .header-controls {
             display: flex;
             align-items: center;
             gap: 16px;
-            padding: 20px;
-            background: var(--glass-bg);
-            border-radius: 16px;
-            border: 1px solid var(--glass-border);
-            margin-bottom: 0; /* Changed from 25px to 0 as container has gap */
         }
-        
+
+        /* --- Button Styles --- */
+        .btn {
+            font-family: var(--font-body);
+            font-weight: 500;
+            font-size: 14px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background-color: rgba(24, 24, 24, 0.5);
+            color: var(--color-text-secondary);
+            border: 1px solid rgba(0, 224, 240, 0.2);
+        }
+        .btn-secondary:hover {
+            color: var(--color-text-primary);
+            border-color: var(--color-accent);
+            box-shadow: 0 0 15px var(--color-accent-glow);
+        }
+
+        /* --- Main Container --- */
+        .dashboard-container {
+            position: relative;
+            z-index: 1;
+            padding: 30px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* --- Card Styles --- */
+        .card {
+            background: rgba(24, 24, 24, 0.5);
+            backdrop-filter: blur(25px);
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: none;
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 24px;
+        }
+        .card:hover {
+            box-shadow: 0 0 30px var(--color-accent-strong-glow);
+        }
+
+        /* --- Profile Card --- */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
         .profile-avatar {
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-purple), var(--deep-purple));
+            background: linear-gradient(135deg, var(--color-accent), #00c8d8);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 32px;
-            color: white;
+            color: #000;
             font-weight: 700;
         }
-        
+
         .profile-info h2 {
             font-size: 1.5rem;
-            margin-bottom: 4px;
-            color: var(--text-primary);
+            margin-bottom: 8px;
+            color: var(--color-text-primary);
         }
-        
+
         .profile-info p {
-            color: var(--text-secondary);
+            color: var(--color-text-secondary);
             font-size: 0.9rem;
+            margin-bottom: 4px;
         }
-        
+
+        .profile-info .points {
+            color: var(--color-accent);
+            font-weight: 700;
+        }
+
+        /* --- Stats Grid --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stats-card {
+            background: rgba(24, 24, 24, 0.5);
+            backdrop-filter: blur(25px);
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: none;
+            transition: box-shadow 0.3s ease;
+        }
+        .stats-card:hover {
+            box-shadow: 0 0 30px var(--color-accent-strong-glow);
+        }
+
+        .card-icon {
+            font-size: 20px;
+            color: var(--color-accent);
+            position: absolute;
+            top: 24px;
+            right: 24px;
+        }
+
+        .stats-value {
+            font-family: var(--font-heading);
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .stats-label {
+            font-size: 16px;
+            color: var(--color-text-secondary);
+        }
+
+        /* --- Main Grid --- */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(0, 224, 240, 0.2);
+        }
+
+        .card-header h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+        }
+
+        .card-header i {
+            color: var(--color-accent);
+        }
+
+        /* --- Chart --- */
         .chart-container {
             position: relative;
             height: 300px;
-            margin-top: 20px;
         }
-        
+
+        /* --- Calendar --- */
         .attendance-calendar {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: 8px;
-            margin-top: 20px;
         }
-        
+
         .calendar-day {
             aspect-ratio: 1;
             border-radius: 8px;
@@ -318,160 +284,185 @@
             justify-content: center;
             font-size: 0.85rem;
             font-weight: 600;
-            border: 1px solid var(--glass-border);
-            color: var(--text-secondary); /* Added for better visibility */
+            border: 1px solid rgba(0, 224, 240, 0.2);
+            color: var(--color-text-secondary);
+            transition: all 0.3s ease;
         }
-        
+
         .calendar-day.present {
-            background: rgba(16, 185, 129, 0.2);
-            border-color: #10b981;
-            color: var(--text-primary); /* Added */
+            background: rgba(22, 163, 74, 0.2);
+            border-color: var(--color-status-green);
+            color: var(--color-text-primary);
         }
-        
+
         .calendar-day.absent {
-            background: rgba(239, 68, 68, 0.2);
-            border-color: #ef4444;
-            color: var(--text-primary); /* Added */
+            background: rgba(255, 69, 69, 0.2);
+            border-color: var(--color-status-red);
+            color: var(--color-text-primary);
         }
-        
+
         .calendar-day.today {
-            border: 2px solid var(--primary-purple);
-            box-shadow: 0 0 15px var(--glow-purple);
-            color: var(--primary-purple); /* Added */
+            border: 2px solid var(--color-accent);
+            box-shadow: 0 0 15px var(--color-accent-glow);
+            color: var(--color-accent);
         }
-        
-        .logout-btn {
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid rgba(239, 68, 68, 0.5);
-            color: #ff6b6b;
+
+        /* --- Event List --- */
+        .event-log-list {
+            list-style: none;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
         }
-        
-        .logout-btn:hover {
-            background: rgba(239, 68, 68, 0.3);
-            border-color: #ef4444;
+
+        .event-log-list li {
+            padding: 12px 0;
+            color: var(--color-text-primary);
+            border-bottom: 1px solid rgba(0, 224, 240, 0.1);
         }
-        /* --- [END] YOUR ORIGINAL STYLES --- */
+
+        .event-log-list li:last-child {
+            border-bottom: none;
+        }
+
+        .event-log-list .date {
+            color: var(--color-accent);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .event-log-list .details {
+            color: var(--color-text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-header {
+                flex-direction: column;
+                gap: 16px;
+                padding: 20px;
+            }
+
+            .dashboard-container {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .user-profile {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 500px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="dashboard-container">
-        <header class="header glass-card">
-            <div class="header-content">
-                <div class="logo-section">
-                    <h1><i class="fas fa-graduation-cap"></i> My Attendance</h1>
-                </div>
-                <div class="controls-section">
-                    <div class="theme-toggle" id="themeToggle">
-                        <div class="theme-toggle-slider"></div>
-                        <i class="fas fa-sun theme-icon sun-icon"></i>
-                        <i class="fas fa-moon theme-icon moon-icon"></i>
-                    </div>
-                    <button id="logoutBtn" class="liquid-button logout-btn">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </button>
-                </div>
-            </div>
-        </header>
-        
-        <div class="user-profile glass-card">
-            <div class="profile-avatar" id="profileAvatar">..</div>
+    <div class="particles" id="particles"></div>
+
+    <header class="main-header">
+        <h1 class="logo-title">MY ATTENDANCE</h1>
+        <div class="header-controls">
+            <button class="btn btn-secondary" id="logoutBtn">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <div class="card user-profile">
+            <div class="profile-avatar" id="profileAvatar">...</div>
             <div class="profile-info">
                 <h2 id="studentName">Loading...</h2>
                 <p>Student ID: <span id="studentId">---</span> | Class: <span id="studentClass">---</span></p>
-                <p>Points Earned: <span id="studentPoints" style="color: var(--primary-purple); font-weight: 700;">0</span></p>
+                <p>Points Earned: <span class="points" id="studentPoints">0</span></p>
             </div>
         </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card glass-card">
-                <div class="stat-card-inner">
-                    <div class="stat-content">
-                        <h3 id="daysPresent">0</h3>
-                        <p>Days Present</p>
-                    </div>
-                    <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
-                </div>
+
+        <section class="stats-grid">
+            <div class="stats-card">
+                <i class="fa-solid fa-calendar-check card-icon"></i>
+                <span class="stats-value" id="daysPresent">0</span>
+                <span class="stats-label">Days Present</span>
             </div>
-            
-            <div class="stat-card glass-card">
-                <div class="stat-card-inner">
-                    <div class="stat-content">
-                        <h3 id="daysAbsent">0</h3>
-                        <p>Days Absent</p>
-                    </div>
-                    <div class="stat-icon"><i class="fas fa-calendar-times"></i></div>
-                </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-calendar-times card-icon"></i>
+                <span class="stats-value" id="daysAbsent">0</span>
+                <span class="stats-label">Days Absent</span>
             </div>
-            
-            <div class="stat-card glass-card">
-                <div class="stat-card-inner">
-                    <div class="stat-content">
-                        <h3 id="attendancePercentage">0%</h3>
-                        <p>Attendance Rate</p>
-                    </div>
-                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
-                </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-chart-line card-icon"></i>
+                <span class="stats-value" id="attendancePercentage">0%</span>
+                <span class="stats-label">Attendance Rate</span>
             </div>
-            
-            <div class="stat-card glass-card">
-                <div class="stat-card-inner">
-                    <div class="stat-content">
-                        <h3 id="currentStreak">0</h3>
-                        <p>Current Streak</p>
-                    </div>
-                    <div class="stat-icon"><i class="fas fa-fire"></i></div>
-                </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-fire card-icon"></i>
+                <span class="stats-value" id="currentStreak">0</span>
+                <span class="stats-label">Current Streak</span>
             </div>
-        </div>
-        
+        </section>
+
         <div class="main-grid">
-            <section class="glass-card">
-                <h2 class="section-title"><i class="fas fa-chart-bar"></i> Attendance Trend</h2>
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-chart-bar"></i> Attendance Trend</h2>
+                </div>
                 <div class="chart-container">
                     <canvas id="attendanceChart"></canvas>
                 </div>
             </section>
-            
-            <section class="glass-card">
-                <h2 class="section-title"><i class="fas fa-calendar-alt"></i> This Month</h2>
+
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-calendar-alt"></i> This Month</h2>
+                </div>
                 <div class="attendance-calendar" id="calendar"></div>
             </section>
         </div>
-        
-        <section class="glass-card">
-            <h2 class="section-title"><i class="fas fa-history"></i> Recent Attendance</h2>
-            <div class="scrollable-list" id="recentAttendance">
-                <p style="text-align: center; color: var(--text-secondary)">Loading...</p>
+
+        <section class="card">
+            <div class="card-header">
+                <h2><i class="fa-solid fa-history"></i> Recent Attendance</h2>
             </div>
+            <ul class="event-log-list" id="recentAttendance">
+                <li style="text-align: center; color: var(--color-text-secondary)">Loading...</li>
+            </ul>
         </section>
-    </div>
-    
+    </main>
+
     <script>
-        // Theme Toggle
-        const themeToggle = document.getElementById('themeToggle');
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                document.body.classList.add('dark-mode');
-                themeToggle.classList.add('dark');
-            } else {
-                document.body.classList.remove('dark-mode');
-                themeToggle.classList.remove('dark');
-            }
+        // Generate animated particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 20 + 's';
+            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+            particlesContainer.appendChild(particle);
         }
-        themeToggle.addEventListener('click', () => {
-            const isDark = document.body.classList.toggle('dark-mode');
-            themeToggle.classList.toggle('dark', isDark);
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        });
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        applyTheme(savedTheme);
-        
+
         // Check authentication
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         
-        // --- FIX 1: Auth Check ---
-        // Was checking user.id, but API calls use user.student_id
         if (!token || !user.student_id) {
             window.location.href = '/login';
         }
@@ -486,14 +477,12 @@
         // Load student data
         async function loadStudentData() {
             try {
-                // Check if user object and student_id exist before fetching
                 if (!user || !user.student_id) {
                     console.error('No student ID found in local storage.');
-                    window.location.href = '/login'; // Redirect if data is missing
+                    window.location.href = '/login';
                     return;
                 }
 
-                // Load student profile
                 const studentResponse = await fetch(`/api/student-profile/${user.student_id}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -510,14 +499,12 @@
                     document.getElementById('studentClass').textContent = `${student.class}-${student.section}`;
                     document.getElementById('studentPoints').textContent = student.points || 0;
                     
-                    // Set avatar initials
                     if (student.name) {
                         const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
                         document.getElementById('profileAvatar').textContent = initials;
                     }
                 }
                 
-                // Load attendance stats
                 const statsResponse = await fetch(`/api/student-stats/${user.student_id}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -534,23 +521,12 @@
                     document.getElementById('currentStreak').textContent = statsData.streak || 0;
                 }
                 
-                // Load attendance history
                 await loadAttendanceHistory();
-                
-                // Load calendar
                 await loadCalendar();
-                
-                // Load chart
                 await loadChart();
                 
             } catch (error) {
                 console.error('Error loading student data:', error);
-                // Handle errors gracefully, e.g., show a message to the user
-                // If auth fails (e.g., token expired), redirect to login
-                if (error.message.includes('401') || error.message.includes('Failed to fetch')) {
-                    // A proper implementation would check response.status
-                    // window.location.href = '/login';
-                }
             }
         }
         
@@ -571,36 +547,28 @@
             
             if (data.attendance && data.attendance.length > 0) {
                 data.attendance.forEach(record => {
-                    const item = document.createElement('div');
-                    item.className = 'list-item';
+                    const item = document.createElement('li');
                     const recordDate = new Date(record.date).toLocaleDateString(undefined, {
                         year: 'numeric', month: 'long', day: 'numeric'
                     });
                     item.innerHTML = `
-                        <div class="item-info">
-                            <strong>${recordDate}</strong>
-                            <small>${record.status} - ${record.time_in || 'N/A'}</small>
-                        </div>
-                        <div class="item-badge">
-                            <small>+${record.points_earned} pts</small>
-                        </div>
+                        <span class="date">${recordDate}</span>
+                        <span class="details">${record.status} - ${record.time_in || 'N/A'} | +${record.points_earned} pts</span>
                     `;
                     listEl.appendChild(item);
                 });
             } else {
-                listEl.innerHTML = '<p style="text-align: center; color: var(--text-secondary)">No attendance records</p>';
+                listEl.innerHTML = '<li style="text-align: center; color: var(--color-text-secondary)">No attendance records</li>';
             }
         }
         
         async function loadCalendar() {
-            // Generate calendar for current month
             const calendarEl = document.getElementById('calendar');
             const today = new Date();
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
             
-            // Fetch attendance for this month
             const response = await fetch(`/api/student-attendance/${user.student_id}?month=${currentMonth + 1}&year=${currentYear}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -615,7 +583,6 @@
             
             if (data.attendance) {
                 data.attendance.forEach(record => {
-                    // Use UTC date to avoid timezone issues
                     const date = new Date(record.date);
                     const dayOfMonth = date.getUTCDate();
                     attendanceMap[dayOfMonth] = record.status;
@@ -628,31 +595,21 @@
                 dayEl.className = 'calendar-day';
                 dayEl.textContent = day;
                 
-                // --- FIX 2: Calendar Logic ---
-                // Re-ordered logic to be more robust
-                
                 if (attendanceMap[day] === 'present') {
                     dayEl.classList.add('present');
                 } else if (attendanceMap[day] === 'absent') {
                     dayEl.classList.add('absent');
-                } else if (day < today.getDate() && !attendanceMap[day]) {
-                    // Only mark *past* days as absent if no record exists
-                    // (Assumes no school on weekends/holidays, which won't have records)
-                    // You might want to refine this logic based on school days
-                    // dayEl.classList.add('absent'); // <-- Optional: Uncomment to mark past non-present days as absent
                 }
                 
                 if (day === today.getDate()) {
                     dayEl.classList.add('today');
                 }
-                // --- End Fix ---
                 
                 calendarEl.appendChild(dayEl);
             }
         }
         
         async function loadChart() {
-            // Fetch last 30 days data
             const response = await fetch(`/api/student-trend/${user.student_id}?days=30`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -666,11 +623,6 @@
             
             if (data.success) {
                 const ctx = document.getElementById('attendanceChart').getContext('2d');
-                
-                // Set chart colors based on theme
-                const isDark = document.body.classList.contains('dark-mode');
-                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                const tickColor = isDark ? '#d1d5db' : '#4b5563';
 
                 new Chart(ctx, {
                     type: 'line',
@@ -679,8 +631,8 @@
                         datasets: [{
                             label: 'Attendance Rate',
                             data: data.values,
-                            borderColor: '#8b5cf6',
-                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            borderColor: '#00E0F0',
+                            backgroundColor: 'rgba(0, 224, 240, 0.1)',
                             tension: 0.4,
                             fill: true
                         }]
@@ -698,21 +650,21 @@
                                 beginAtZero: true,
                                 max: 100,
                                 ticks: {
-                                    color: tickColor,
+                                    color: '#AAAAAA',
                                     callback: function(value) {
                                         return value + '%';
                                     }
                                 },
                                 grid: {
-                                    color: gridColor
+                                    color: 'rgba(0, 224, 240, 0.1)'
                                 }
                             },
                             x: {
                                 ticks: {
-                                    color: tickColor
+                                    color: '#AAAAAA'
                                 },
                                 grid: {
-                                    color: gridColor
+                                    color: 'rgba(0, 224, 240, 0.1)'
                                 }
                             }
                         }
@@ -721,7 +673,6 @@
             }
         }
         
-        // Initialize
         loadStudentData();
     </script>
 </body>

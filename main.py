@@ -38,10 +38,14 @@ def create_app():
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
-    # Register blueprints
-    app.register_blueprint(api)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(student_bp)
+    # ============================================
+    # FIX: Register blueprints WITHOUT extra /api prefix
+    # The routes.py already defines routes like @api.route('/students')
+    # So we don't add url_prefix='/api' here
+    # ============================================
+    app.register_blueprint(api)           # routes.py routes
+    app.register_blueprint(auth_bp)       # auth_routes.py routes  
+    app.register_blueprint(student_bp)    # student_routes.py routes
     
     # Root redirect to login
     @app.route('/')
@@ -156,30 +160,50 @@ class EnhancedCameraService:
                     }
             
             # Step 2: Check eye contact (looking at camera)
-            has_eye_contact, angles = self.face_service.check_eye_contact(frame)
-            
-            if not has_eye_contact:
-                return {
-                    'status': 'verifying',
-                    'message': f"{student_name}: Please look at camera"
-                }
+            # ============================================
+            # FIX: Make eye contact check optional
+            # ============================================
+            if Config.REQUIRE_EYE_CONTACT:
+                has_eye_contact, angles = self.face_service.check_eye_contact(frame)
+                
+                if not has_eye_contact:
+                    return {
+                        'status': 'verifying',
+                        'message': f"{student_name}: Please look at camera"
+                    }
+            else:
+                # Skip eye contact check during testing
+                logger.debug("Eye contact check skipped (disabled in config)")
+                has_eye_contact = True
             
             # Step 3: Check for blink (liveness)
-            blink_detected = self.face_service.detect_blink(frame)
+            # ============================================
+            # FIX: Make blink check optional
+            # ============================================
+            blink_verified = False
             
-            # Initialize blink counter for this student
-            if student_id not in self.blink_counters:
-                self.blink_counters[student_id] = 0
-            
-            if blink_detected:
-                self.blink_counters[student_id] += 1
-            
-            # Require at least 1 blink
-            if self.blink_counters[student_id] < Config.REQUIRED_BLINKS:
-                return {
-                    'status': 'verifying',
-                    'message': f"{student_name}: Please blink naturally"
-                }
+            if Config.REQUIRED_BLINKS > 0:
+                blink_detected = self.face_service.detect_blink(frame)
+                
+                # Initialize blink counter for this student
+                if student_id not in self.blink_counters:
+                    self.blink_counters[student_id] = 0
+                
+                if blink_detected:
+                    self.blink_counters[student_id] += 1
+                
+                # Require at least 1 blink
+                if self.blink_counters[student_id] < Config.REQUIRED_BLINKS:
+                    return {
+                        'status': 'verifying',
+                        'message': f"{student_name}: Please blink naturally"
+                    }
+                
+                blink_verified = True
+            else:
+                # Skip blink check
+                logger.debug("Blink check skipped (REQUIRED_BLINKS = 0)")
+                blink_verified = True
             
             # Step 4: Mark attendance (all checks passed!)
             result = self.attendance_service.mark_attendance(

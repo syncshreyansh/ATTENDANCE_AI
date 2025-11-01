@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 student_bp = Blueprint('student', __name__)
 
+# ============================================
+# FIX: Remove @token_required from HTML route
+# ============================================
 @student_bp.route('/student-dashboard')
-@token_required
-def student_dashboard_page(current_user):
-    """Serve student dashboard page"""
-    if current_user.role != 'student':
-        return jsonify({'message': 'Access denied'}), 403
+def student_dashboard_page():
+    """Serve student dashboard page (authentication handled in JavaScript)"""
     return render_template('student_dashboard.html')
 
 @student_bp.route('/api/student-profile/<int:student_id>')

@@ -1,4 +1,4 @@
-// Enhanced dashboard with success sound and instant updates
+// Enhanced dashboard with new UI structure
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -9,48 +9,33 @@ if (!token || !user.id || user.role !== 'admin') {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // === THEME TOGGLE LOGIC ===
-  const themeToggle = document.getElementById("themeToggle");
-  function applyTheme(theme) {
-    if (theme === "dark") {
-      document.body.classList.add("dark-mode");
-      themeToggle.classList.add("dark");
-    } else {
-      document.body.classList.remove("dark-mode");
-      themeToggle.classList.remove("dark");
-    }
+  // Generate animated particles
+  const particlesContainer = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    particle.style.left = Math.random() * 100 + '%';
+    particle.style.top = Math.random() * 100 + '%';
+    particle.style.animationDelay = Math.random() * 20 + 's';
+    particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+    particlesContainer.appendChild(particle);
   }
-  themeToggle.addEventListener("click", () => {
-    const isDark = document.body.classList.toggle("dark-mode");
-    themeToggle.classList.toggle("dark", isDark);
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-  });
-  const savedTheme = localStorage.getItem("theme");
-  const prefersDark =
-    window.matchMedia &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  applyTheme(savedTheme || (prefersDark ? "dark" : "light"));
 
   window.dashboard = new AttendanceDashboard();
 });
 
 // === SUCCESS SOUND ===
 function playSuccessSound() {
-  // Create success sound using Web Audio API
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  
-  // Create oscillator for success tone
   const oscillator = audioContext.createOscillator();
   const gainNode = audioContext.createGain();
   
   oscillator.connect(gainNode);
   gainNode.connect(audioContext.destination);
   
-  // Success sound: pleasant "ding" (C major chord)
-  oscillator.frequency.value = 523.25; // C5
+  oscillator.frequency.value = 523.25;
   oscillator.type = 'sine';
   
-  // Envelope
   gainNode.gain.setValueAtTime(0, audioContext.currentTime);
   gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
   gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
@@ -68,7 +53,7 @@ class AttendanceDashboard {
     this.liveStream = null;
     this.processingInterval = null;
     this.processingCanvas = null;
-    this.cameraStopRequested = false; // NEW: Flag for camera stop
+    this.cameraStopRequested = false;
 
     // Cache DOM elements
     this.captureBtn = document.getElementById("capturePhoto");
@@ -76,13 +61,12 @@ class AttendanceDashboard {
     this.videoPreview = document.getElementById("videoPreview");
     this.photoCanvas = document.getElementById("photoCanvas");
     this.enrollSubmitBtn = document.getElementById("enrollSubmitBtn");
-    this.enrollModal = document.getElementById("enrollModal");
+    this.enrollModal = document.getElementById("enroll-modal-backdrop");
     this.enrollForm = document.getElementById("enrollForm");
 
     this.startBtn = document.getElementById("startSystem");
     this.stopBtn = document.getElementById("stopSystem");
-    this.statusDot = document.getElementById("statusDot");
-    this.statusText = document.getElementById("statusText");
+    this.statusIndicator = document.getElementById("status-indicator");
 
     this.liveFeedVideo = document.getElementById("liveFeedVideo");
     this.feedPlaceholder = document.getElementById("feedPlaceholder");
@@ -110,30 +94,26 @@ class AttendanceDashboard {
     this.startBtn.addEventListener("click", () => this.startSystem());
     this.stopBtn.addEventListener("click", () => this.stopSystem());
 
-    document.querySelector('.header').addEventListener('click', (e) => {
-      if (e.target.closest('#logoutBtn')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     });
 
-    document.getElementById("enrollBtn").addEventListener("click", () => this.openModal());
-    document.getElementById("closeModal").addEventListener("click", () => this.closeModal());
-    document.getElementById("cancelEnroll").addEventListener("click", () => this.closeModal());
+    document.getElementById("enroll-btn").addEventListener("click", () => this.openModal());
+    document.getElementById("close-modal-btn").addEventListener("click", () => this.closeModal());
+    document.getElementById("cancel-modal-btn").addEventListener("click", () => this.closeModal());
 
     this.enrollForm.addEventListener("submit", (e) => this.handleEnrollSubmit(e));
     this.captureBtn.addEventListener("click", () => this.capturePhoto());
     this.recaptureBtn.addEventListener("click", () => this.recapturePhoto());
 
     // Enhanced validation for form inputs
-    document.getElementById("studentName").addEventListener("input", (e) => {
-      // Only allow alphabets and spaces
+    document.getElementById("student-name").addEventListener("input", (e) => {
       e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
     });
 
-    document.getElementById("parentPhone").addEventListener("input", (e) => {
-      // Only allow digits
+    document.getElementById("parent-phone").addEventListener("input", (e) => {
       e.target.value = e.target.value.replace(/\D/g, '');
     });
 
@@ -171,7 +151,7 @@ class AttendanceDashboard {
       });
       this.videoPreview.srcObject = this.videoStream;
       this.videoPreview.style.display = "block";
-      this.photoCanvas.style.display = "none";
+      this.videoPreview.parentElement.querySelector('.feed-placeholder').style.display = "none";
     } catch (error) {
       this.showNotification(
         "Camera access denied. Please allow camera permissions.",
@@ -197,7 +177,7 @@ class AttendanceDashboard {
   async startLiveFeed() {
     if (this.liveStream) return;
     
-    this.cameraStopRequested = false; // Reset flag
+    this.cameraStopRequested = false;
     
     try {
       this.liveStream = await navigator.mediaDevices.getUserMedia({
@@ -222,12 +202,10 @@ class AttendanceDashboard {
   stopLiveFeed() {
     console.log('Stopping live feed...');
     
-    this.cameraStopRequested = true; // Set flag to prevent restarts
+    this.cameraStopRequested = true;
     
-    // Stop frame processing first
     this.stopFrameProcessing();
 
-    // Stop camera stream with proper cleanup
     if (this.liveStream) {
       const tracks = this.liveStream.getTracks();
       tracks.forEach((track) => {
@@ -237,7 +215,6 @@ class AttendanceDashboard {
       this.liveStream = null;
     }
     
-    // Clear video element
     if (this.liveFeedVideo) {
       this.liveFeedVideo.srcObject = null;
       this.liveFeedVideo.style.display = "none";
@@ -247,7 +224,6 @@ class AttendanceDashboard {
     this.feedPlaceholder.style.display = "flex";
     console.log('Live feed stopped completely');
     
-    // Extra safety: Check after 500ms
     setTimeout(() => {
       if (this.liveStream && !this.cameraStopRequested) {
         console.warn('Camera still active after stop - forcing cleanup');
@@ -309,14 +285,14 @@ class AttendanceDashboard {
       );
       return;
     }
-    this.enrollModal.style.display = "block";
+    this.enrollModal.classList.add('show');
     this.startVideoStream();
     this.resetCaptureUI();
   }
 
   closeModal() {
     this.stopVideoStream();
-    this.enrollModal.style.display = "none";
+    this.enrollModal.classList.remove('show');
     this.enrollForm.reset();
     this.resetCaptureUI();
     
@@ -414,7 +390,7 @@ class AttendanceDashboard {
 
       if (data.length === 0) {
         this.recentEventsList.innerHTML =
-          '<p style="text-align: center; color: var(--text-secondary)">No events yet</p>';
+          '<li style="text-align: center; color: var(--color-text-secondary)">No events yet</li>';
         return;
       }
 
@@ -431,11 +407,13 @@ class AttendanceDashboard {
   startSystem() {
     this.socket.emit("start_system");
     this.startBtn.disabled = true;
+    this.stopBtn.disabled = false;
   }
 
   stopSystem() {
     this.socket.emit("stop_system");
     this.stopBtn.disabled = true;
+    this.startBtn.disabled = false;
   }
 
   updateSystemStatus(isRunning) {
@@ -443,23 +421,22 @@ class AttendanceDashboard {
     if (isRunning) {
       this.startBtn.disabled = true;
       this.stopBtn.disabled = false;
-      this.statusDot.classList.remove("offline");
-      this.statusDot.classList.add("online");
-      this.statusText.textContent = "Online";
+      this.statusIndicator.classList.remove("status-offline");
+      this.statusIndicator.classList.add("status-online");
+      this.statusIndicator.textContent = "● Online";
       this.startLiveFeed();
     } else {
       this.startBtn.disabled = false;
       this.stopBtn.disabled = true;
-      this.statusDot.classList.remove("online");
-      this.statusDot.classList.add("offline");
-      this.statusText.textContent = "Offline";
+      this.statusIndicator.classList.remove("status-online");
+      this.statusIndicator.classList.add("status-offline");
+      this.statusIndicator.textContent = "● Offline";
       this.stopLiveFeed();
       this.showOverlay(null);
     }
   }
 
   handleAttendanceUpdate(data) {
-    // Play success sound
     playSuccessSound();
     
     this.showOverlay(`${data.student_name} Marked!`, "success");
@@ -474,22 +451,18 @@ class AttendanceDashboard {
       time_in: data.timestamp,
     });
 
-    // INSTANT UPDATE: Update stats immediately
     this.updateStatsInstantly();
   }
 
   updateStatsInstantly() {
-    // Increment present count
     const currentPresent = parseInt(this.presentCountEl.textContent) || 0;
     const newPresent = currentPresent + 1;
     this.animateStatChange(this.presentCountEl, currentPresent, newPresent);
 
-    // Decrement absent count
     const currentAbsent = parseInt(this.absentCountEl.textContent) || 0;
     const newAbsent = Math.max(0, currentAbsent - 1);
     this.animateStatChange(this.absentCountEl, currentAbsent, newAbsent);
 
-    // Recalculate attendance rate
     const totalStudents = parseInt(this.totalStudentsEl.textContent) || 0;
     if (totalStudents > 0) {
       const currentRate = parseInt(this.attendanceRateEl.textContent) || 0;
@@ -497,7 +470,6 @@ class AttendanceDashboard {
       this.animateStatChange(this.attendanceRateEl, currentRate, newRate, '%');
     }
 
-    // Refresh from server after 200ms for accuracy
     setTimeout(() => {
       this.loadStats();
     }, 200);
@@ -505,7 +477,7 @@ class AttendanceDashboard {
 
   animateStatChange(element, oldValue, newValue, suffix = '') {
     element.style.transform = 'scale(1.2)';
-    element.style.color = 'var(--primary-purple)';
+    element.style.color = 'var(--color-accent)';
     element.style.transition = 'all 0.3s ease';
 
     const duration = 300;
@@ -525,7 +497,7 @@ class AttendanceDashboard {
         
         setTimeout(() => {
           element.style.transform = 'scale(1)';
-          element.style.color = 'var(--text-primary)';
+          element.style.color = 'var(--color-text-primary)';
         }, 200);
       }
     }, stepDuration);
@@ -543,12 +515,11 @@ class AttendanceDashboard {
       return;
     }
 
-    // Enhanced validation
-    const name = document.getElementById("studentName").value.trim();
-    const studentId = document.getElementById("studentId").value.trim();
-    const studentClass = document.getElementById("studentClass").value.trim();
-    const section = document.getElementById("studentSection").value.trim();
-    const parentPhone = document.getElementById("parentPhone").value.trim();
+    const name = document.getElementById("student-name").value.trim();
+    const studentId = document.getElementById("student-id").value.trim();
+    const studentClass = document.getElementById("class").value.trim();
+    const section = document.getElementById("section").value.trim();
+    const parentPhone = document.getElementById("parent-phone").value.trim();
 
     if (!name || !studentId || !studentClass || !section || !parentPhone) {
       this.showNotification("All fields are mandatory.", "error");
@@ -566,7 +537,7 @@ class AttendanceDashboard {
     }
 
     this.enrollSubmitBtn.disabled = true;
-    this.enrollSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enrolling...';
+    this.enrollSubmitBtn.innerHTML = '<span class="spinner"></span> Enrolling...';
 
     const studentData = {
       name: name,
@@ -577,7 +548,6 @@ class AttendanceDashboard {
     };
 
     try {
-      // Create student
       console.log('Creating student...');
       const createResponse = await fetch("/api/students", {
         method: "POST",
@@ -597,9 +567,8 @@ class AttendanceDashboard {
         return;
       }
       
-      // Create login
       console.log('Creating login...');
-      const createLoginResponse = await fetch("/api/auth/register", {
+      await fetch("/api/auth/register", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -614,7 +583,6 @@ class AttendanceDashboard {
         }),
       });
 
-      // Enroll face
       console.log('Enrolling face...');
       const canvas = document.getElementById("photoCanvas");
       const frameData = canvas.toDataURL("image/jpeg", 0.95).split(",")[1];
@@ -679,13 +647,12 @@ class AttendanceDashboard {
   }
 
   addRecentEvent(data) {
-    const placeholder = this.recentEventsList.querySelector("p");
-    if (placeholder) {
+    const placeholder = this.recentEventsList.querySelector("li");
+    if (placeholder && placeholder.textContent.includes("No events yet")) {
       this.recentEventsList.innerHTML = "";
     }
 
-    const item = document.createElement("div");
-    item.className = "list-item";
+    const item = document.createElement("li");
 
     let time = data.time_in;
     
@@ -695,15 +662,7 @@ class AttendanceDashboard {
       time = this.formatTime(new Date(time).getTime() / 1000);
     }
 
-    item.innerHTML = `
-      <div class="item-info">
-        <strong>${data.student_name}</strong>
-        <small>Marked present</small>
-      </div>
-      <div class="item-badge">
-        <small>${time || "Just now"}</small>
-      </div>
-    `;
+    item.innerHTML = `<span class="time">[${time || "Just now"}]</span> ${data.student_name} - Marked present`;
 
     this.recentEventsList.prepend(item);
   }

@@ -18,6 +18,7 @@ from config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Create blueprint WITHOUT url_prefix (we'll add it in main.py)
 api = Blueprint('api', __name__)
 attendance_service = AttendanceService()
 face_service = FaceRecognitionService()
@@ -59,14 +60,17 @@ def validate_student_id(student_id):
         return False, "Student ID must be at least 3 characters"
     return True, ""
 
+# ============================================
+# HTML ROUTES (NO TOKEN REQUIRED)
+# ============================================
 @api.route('/admin-dashboard')
-@token_required
-def dashboard(current_user):
-    """Serve main dashboard"""
-    if current_user.role != 'admin':
-        return jsonify({'message': 'Access denied'}), 403
+def dashboard():
+    """Serve main dashboard (authentication handled in JavaScript)"""
     return render_template('dashboard.html')
 
+# ============================================
+# API ROUTES (TOKEN REQUIRED)
+# ============================================
 @api.route('/api/students', methods=['GET', 'POST'])
 @token_required
 def students(current_user):

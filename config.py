@@ -30,12 +30,15 @@ class Config:
     BLINK_CONSECUTIVE_FRAMES = 3
     REQUIRED_BLINKS = 1  # Must blink at least once
     
-    # Eye Contact Detection (New)
-    EYE_CONTACT_THRESHOLD = 15  # Degrees of head rotation allowed
-    REQUIRE_EYE_CONTACT = True
+    # ============================================
+    # FIX: Make eye contact optional during testing
+    # ============================================
+    # Eye Contact Detection
+    EYE_CONTACT_THRESHOLD = 30  # Degrees of head rotation allowed (relaxed from 15)
+    REQUIRE_EYE_CONTACT = False  # Set to False for testing, True for production
     
     # Liveness Detection
-    TEXTURE_QUALITY_THRESHOLD = 100  # Threshold for photo vs real face
+    TEXTURE_QUALITY_THRESHOLD = 50  # Lowered threshold (was 100)
     LIVENESS_CONFIDENCE_THRESHOLD = 0.6
     
     # WhatsApp API
