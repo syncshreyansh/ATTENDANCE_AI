@@ -1,4 +1,4 @@
-// Enhanced dashboard with new UI structure
+// Enhanced dashboard with new UI structure and fixed camera stop
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -175,11 +175,15 @@ class AttendanceDashboard {
   }
 
   async startLiveFeed() {
-    if (this.liveStream) return;
+    if (this.liveStream) {
+      console.log('Live feed already running');
+      return;
+    }
     
     this.cameraStopRequested = false;
     
     try {
+      console.log('Requesting camera access...');
       this.liveStream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480 },
       });
@@ -191,6 +195,7 @@ class AttendanceDashboard {
       this.startFrameProcessing();
       console.log('Live camera started successfully');
     } catch (error) {
+      console.error('Camera access error:', error);
       this.showNotification(
         "Camera access denied. Please allow camera permissions.",
         "error"
@@ -200,53 +205,65 @@ class AttendanceDashboard {
   }
 
   stopLiveFeed() {
-    console.log('Stopping live feed...');
+    console.log('=== STOPPING LIVE FEED ===');
     
+    // Set stop flag immediately
     this.cameraStopRequested = true;
     
+    // Stop frame processing first
     this.stopFrameProcessing();
 
+    // Stop all video tracks
     if (this.liveStream) {
+      console.log('Stopping media stream tracks...');
       const tracks = this.liveStream.getTracks();
       tracks.forEach((track) => {
+        console.log(`Stopping track: ${track.label} (state: ${track.readyState})`);
         track.stop();
-        console.log('Live camera track stopped:', track.label, track.readyState);
       });
       this.liveStream = null;
+      console.log('All tracks stopped');
     }
     
+    // Clear video element
     if (this.liveFeedVideo) {
+      console.log('Clearing video element...');
       this.liveFeedVideo.srcObject = null;
       this.liveFeedVideo.style.display = "none";
       this.liveFeedVideo.pause();
+      
+      // Force browser to release resources
+      this.liveFeedVideo.load();
     }
     
-    this.feedPlaceholder.style.display = "flex";
-    console.log('Live feed stopped completely');
+    // Show placeholder
+    if (this.feedPlaceholder) {
+      this.feedPlaceholder.style.display = "flex";
+    }
     
-    setTimeout(() => {
-      if (this.liveStream && !this.cameraStopRequested) {
-        console.warn('Camera still active after stop - forcing cleanup');
-        this.stopLiveFeed();
-      }
-    }, 500);
+    // Clear overlay
+    this.showOverlay(null);
+    
+    console.log('=== LIVE FEED STOPPED SUCCESSFULLY ===');
   }
 
   startFrameProcessing() {
     if (this.processingInterval) {
-      clearInterval(this.processingInterval);
+      console.log('Frame processing already running');
+      return;
     }
     
+    console.log('Starting frame processing...');
     this.processingInterval = setInterval(() => {
-      if (!this.cameraStopRequested) {
+      if (!this.cameraStopRequested && this.isSystemRunning) {
         this.captureAndSendFrame();
       }
     }, 500);
-    console.log('Frame processing started');
   }
 
   stopFrameProcessing() {
     if (this.processingInterval) {
+      console.log('Stopping frame processing...');
       clearInterval(this.processingInterval);
       this.processingInterval = null;
       console.log('Frame processing stopped');
@@ -405,19 +422,26 @@ class AttendanceDashboard {
   // === System & Socket Methods ===
 
   startSystem() {
+    console.log('Starting system...');
     this.socket.emit("start_system");
     this.startBtn.disabled = true;
     this.stopBtn.disabled = false;
   }
 
   stopSystem() {
+    console.log('Stop button clicked');
     this.socket.emit("stop_system");
     this.stopBtn.disabled = true;
     this.startBtn.disabled = false;
+    
+    // Force immediate camera stop
+    this.stopLiveFeed();
   }
 
   updateSystemStatus(isRunning) {
+    console.log('System status update:', isRunning);
     this.isSystemRunning = isRunning;
+    
     if (isRunning) {
       this.startBtn.disabled = true;
       this.stopBtn.disabled = false;
