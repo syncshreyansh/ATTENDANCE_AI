@@ -1,6 +1,6 @@
-# Main Flask application with liveness detection and IST timezone
+# Complete main Flask application - working version
 from flask import Flask, redirect, url_for
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from models import db, AbsenceTracker, ActivityLog
 from routes import api
@@ -18,7 +18,6 @@ import pytz
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -32,22 +31,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Initialize extensions
     db.init_app(app)
-    
-    # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
-    # ============================================
-    # FIX: Register blueprints WITHOUT extra /api prefix
-    # The routes.py already defines routes like @api.route('/students')
-    # So we don't add url_prefix='/api' here
-    # ============================================
-    app.register_blueprint(api)           # routes.py routes
-    app.register_blueprint(auth_bp)       # auth_routes.py routes  
-    app.register_blueprint(student_bp)    # student_routes.py routes
+    app.register_blueprint(api)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(student_bp)
     
-    # Root redirect to login
     @app.route('/')
     def index():
         return redirect(url_for('auth.login_page'))
@@ -55,27 +45,27 @@ def create_app():
     return app
 
 app = create_app()
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    max_http_buffer_size=10000000,
+    ping_timeout=60,
+    ping_interval=25,
+    async_mode='threading'
+)
 
 class EnhancedCameraService:
     def __init__(self):
         self.is_running = False
-        self.last_recognition_time = 0
+        self.last_recognition_time = {}
         self.recognition_cooldown = 5
-        self.recognition_history = {}
+        self.last_event_log_time = {}
         
-        # Blink detection state
-        self.blink_counters = {}  # Per student
-        self.ear_history = {}  # Track EAR values
-        
-        # Import services
         from face_recognition_service import FaceRecognitionService
         from attendance_service import AttendanceService
-        from liveness_detection import LivenessDetector
         
         self.face_service = FaceRecognitionService()
         self.attendance_service = AttendanceService()
-        self.liveness_detector = LivenessDetector()
 
     def start_system(self):
         """Start the attendance system"""
@@ -84,11 +74,8 @@ class EnhancedCameraService:
             return
         
         self.is_running = True
-        self.recognition_history = {}
-        self.blink_counters = {}
-        self.ear_history = {}
+        self.last_recognition_time = {}
         
-        # Load face encodings
         with app.app_context():
             try:
                 self.face_service.load_encodings_from_db()
@@ -96,23 +83,16 @@ class EnhancedCameraService:
             except Exception as e:
                 logger.error(f"Failed to load face encodings: {e}")
         
-        logger.info("Enhanced camera service started with liveness detection")
+        logger.info("Enhanced camera service started with intelligent state management")
 
     def stop_system(self):
         """Stop the attendance system"""
         self.is_running = False
-        self.recognition_history = {}
-        self.blink_counters = {}
-        self.ear_history = {}
+        self.last_recognition_time = {}
         logger.info("Camera service stopped")
 
     def process_frame(self, frame_data):
-        """
-        Process frame with ENHANCED liveness detection:
-        - Requires blink detection
-        - Requires eye contact
-        - Detects spoofing attempts
-        """
+        """Process frame with intelligent state-based notifications"""
         if not self.is_running:
             return {'status': 'system_stopped'}
         
@@ -125,132 +105,110 @@ class EnhancedCameraService:
             if frame is None:
                 return {'status': 'invalid_frame'}
             
-            # Step 1: Recognize faces
-            rec_result = self.face_service.recognize_faces(frame)
-            total_faces = rec_result['total_faces']
-            matches = rec_result['matches']
-            
-            if total_faces == 0:
-                return {'status': 'clear'}
-            
-            if len(matches) == 0:
-                return {
-                    'status': 'unknown',
-                    'message': 'Face not recognized - Not enrolled'
-                }
-            
-            # Process first match
-            person = matches[0]
-            student_id = person['student_id']
-            confidence = person['confidence']
-            student_name = person['name']
+            # Use enhanced recognition with state management
+            status, message, data = self.face_service.recognize_faces_with_state(frame)
             
             current_time = time.time()
             
-            # Check cooldown
-            if student_id in self.recognition_history:
-                last_time = self.recognition_history[student_id]['time']
-                time_diff = current_time - last_time
-                
-                if time_diff < self.recognition_cooldown:
-                    remaining = int(self.recognition_cooldown - time_diff)
-                    return {
-                        'status': 'cooldown',
-                        'message': f"{student_name} already marked ({remaining}s cooldown)"
-                    }
-            
-            # Step 2: Check eye contact (looking at camera)
-            # ============================================
-            # FIX: Make eye contact check optional
-            # ============================================
-            if Config.REQUIRE_EYE_CONTACT:
-                has_eye_contact, angles = self.face_service.check_eye_contact(frame)
-                
-                if not has_eye_contact:
-                    return {
-                        'status': 'verifying',
-                        'message': f"{student_name}: Please look at camera"
-                    }
-            else:
-                # Skip eye contact check during testing
-                logger.debug("Eye contact check skipped (disabled in config)")
-                has_eye_contact = True
-            
-            # Step 3: Check for blink (liveness)
-            # ============================================
-            # FIX: Make blink check optional
-            # ============================================
-            blink_verified = False
-            
-            if Config.REQUIRED_BLINKS > 0:
-                blink_detected = self.face_service.detect_blink(frame)
-                
-                # Initialize blink counter for this student
-                if student_id not in self.blink_counters:
-                    self.blink_counters[student_id] = 0
-                
-                if blink_detected:
-                    self.blink_counters[student_id] += 1
-                
-                # Require at least 1 blink
-                if self.blink_counters[student_id] < Config.REQUIRED_BLINKS:
-                    return {
-                        'status': 'verifying',
-                        'message': f"{student_name}: Please blink naturally"
-                    }
-                
-                blink_verified = True
-            else:
-                # Skip blink check
-                logger.debug("Blink check skipped (REQUIRED_BLINKS = 0)")
-                blink_verified = True
-            
-            # Step 4: Mark attendance (all checks passed!)
-            result = self.attendance_service.mark_attendance(
-                student_id,
-                confidence,
-                blink_verified=True,
-                eye_contact_verified=True
-            )
-            
-            if result['success']:
-                logger.info(f"✓ Attendance marked for {student_name} with full verification")
-                
-                # Reset counters and set cooldown
-                self.blink_counters[student_id] = 0
-                self.recognition_history[student_id] = {
-                    'time': current_time,
-                    'count': 0,
-                    'name': student_name
-                }
-                
+            # Handle different states
+            if status == 'obstructed':
+                self._log_recent_event('camera_obstructed', message)
                 return {
-                    'status': 'attendance_marked',
-                    'results': [{
-                        'student_name': result['student_name'],
-                        'points': result['points'],
-                        'timestamp': current_time,
-                        'confidence': confidence
-                    }]
+                    'status': 'obstructed',
+                    'message': message
                 }
-            else:
-                # Already marked
-                self.recognition_history[student_id] = {
-                    'time': current_time,
-                    'count': 0,
-                    'name': student_name
-                }
-                
+            
+            if status == 'no_face':
+                return {'status': 'clear'}
+            
+            if status == 'multiple_faces':
                 return {
-                    'status': 'already_marked',
-                    'message': f"{student_name} - {result.get('message', 'Already marked today')}"
+                    'status': 'error',
+                    'message': message
                 }
+            
+            if status == 'unknown':
+                return {
+                    'status': 'unknown',
+                    'message': message
+                }
+            
+            if status in ['verifying_gaze', 'verifying_blink']:
+                return {
+                    'status': 'verifying',
+                    'message': message
+                }
+            
+            if status == 'verified':
+                student_id = data['student_id']
+                student_name = data['student_name']
+                confidence = data['confidence']
+                
+                # Check cooldown
+                if student_id in self.last_recognition_time:
+                    last_time = self.last_recognition_time[student_id]
+                    time_diff = current_time - last_time
+                    
+                    if time_diff < self.recognition_cooldown:
+                        remaining = int(self.recognition_cooldown - time_diff)
+                        return {
+                            'status': 'cooldown',
+                            'message': f"{student_name} already marked ({remaining}s cooldown)"
+                        }
+                
+                # Mark attendance
+                result = self.attendance_service.mark_attendance(
+                    student_id,
+                    confidence,
+                    blink_verified=True,
+                    eye_contact_verified=True
+                )
+                
+                if result['success']:
+                    logger.info(f"✓ Attendance marked for {student_name}")
+                    
+                    self.last_recognition_time[student_id] = current_time
+                    
+                    return {
+                        'status': 'attendance_marked',
+                        'results': [{
+                            'student_name': result['student_name'],
+                            'points': result['points'],
+                            'timestamp': current_time,
+                            'confidence': confidence
+                        }]
+                    }
+                else:
+                    self.last_recognition_time[student_id] = current_time
+                    
+                    return {
+                        'status': 'already_marked',
+                        'message': f"{student_name} - {result.get('message', 'Already marked today')}"
+                    }
+            
+            return {'status': 'processing'}
         
         except Exception as e:
             logger.error(f"Error processing frame: {e}")
             import traceback
             traceback.print_exc()
             return {'status': 'error', 'message': str(e)}
+
+    def _log_recent_event(self, event_type, message):
+        """Log events to Recent Events"""
+        current_time = time.time()
+        
+        if event_type in self.last_event_log_time:
+            if current_time - self.last_event_log_time[event_type] < 10:
+                return
+        
+        self.last_event_log_time[event_type] = current_time
+        
+        socketio.emit('recent_event', {
+            'type': event_type,
+            'message': message,
+            'timestamp': current_time
+        })
 
 camera_service = EnhancedCameraService()
 
@@ -260,22 +218,22 @@ def handle_start_system():
     """Start the attendance system"""
     try:
         camera_service.start_system()
-        socketio.emit('system_started', {'status': 'Enhanced system activated with liveness detection'})
+        emit('system_started', {'status': 'System activated'})
         logger.info("System started via socket")
     except Exception as e:
         logger.error(f"Error starting system: {e}")
-        socketio.emit('system_error', {'message': str(e)})
+        emit('system_error', {'message': str(e)})
 
 @socketio.on('stop_system')
 def handle_stop_system():
     """Stop the attendance system"""
     try:
         camera_service.stop_system()
-        socketio.emit('system_stopped', {'status': 'Camera system deactivated'})
+        emit('system_stopped', {'status': 'System deactivated'})
         logger.info("System stopped via socket")
     except Exception as e:
         logger.error(f"Error stopping system: {e}")
-        socketio.emit('system_error', {'message': str(e)})
+        emit('system_error', {'message': str(e)})
 
 @socketio.on('process_frame')
 def handle_process_frame(data):
@@ -287,14 +245,13 @@ def handle_process_frame(data):
         
         result = camera_service.process_frame(frame_data)
         
-        # Emit appropriate response
         if result['status'] == 'attendance_marked':
             for attendance_result in result['results']:
-                socketio.emit('attendance_update', attendance_result)
-        elif result['status'] in ['recognizing', 'verifying', 'unknown', 'already_marked', 'cooldown']:
-            socketio.emit('recognition_status', result)
+                emit('attendance_update', attendance_result)
+        elif result['status'] in ['verifying', 'unknown', 'already_marked', 'cooldown', 'error', 'obstructed']:
+            emit('recognition_status', result)
         elif result['status'] == 'clear':
-            socketio.emit('recognition_status', {'status': 'clear'})
+            emit('recognition_status', {'status': 'clear'})
     except Exception as e:
         logger.error(f"Error handling frame: {e}")
 
@@ -303,7 +260,6 @@ def setup_scheduler():
     """Setup daily attendance reset scheduler"""
     scheduler = BackgroundScheduler(timezone=IST)
     
-    # Run daily at midnight IST
     scheduler.add_job(
         func=daily_attendance_check,
         trigger='cron',
@@ -325,11 +281,9 @@ def daily_attendance_check():
 
 if __name__ == '__main__':
     with app.app_context():
-        # Create database tables
         db.create_all()
         logger.info("Database tables created")
         
-        # Create default admin user
         from auth_service import AuthService
         admin_user = User.query.filter_by(username='admin').first()
         if not admin_user:
@@ -341,10 +295,8 @@ if __name__ == '__main__':
             )
             logger.info(f"Default admin user created: {result}")
     
-    # Setup scheduler
     setup_scheduler()
     
-    # Start Flask-SocketIO server
     logger.info(f"Starting server on port {Config.FLASK_PORT}")
     logger.info(f"Timezone: {Config.TIMEZONE}")
     logger.info(f"Current IST time: {datetime.now(IST).strftime('%Y-%m-%d %I:%M:%S %p')}")

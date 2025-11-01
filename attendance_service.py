@@ -1,4 +1,4 @@
-# Enhanced attendance management with absence tracking and WhatsApp alerts
+# Enhanced attendance management with 3-day absence WhatsApp alerts
 from datetime import datetime, date, time, timedelta
 import pytz
 from models import db, Student, Attendance, Alert, AbsenceTracker, ActivityLog, get_ist_now
@@ -8,7 +8,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Timezone
 IST = pytz.timezone(Config.TIMEZONE)
 
 class AttendanceService:
@@ -51,7 +50,7 @@ class AttendanceService:
                 student.points += points
                 db.session.add(attendance)
                 
-                # Update absence tracker
+                # Update absence tracker - RESET consecutive absences
                 self.update_absence_tracker(student_id, is_present=True)
                 
                 db.session.commit()
@@ -117,13 +116,15 @@ class AttendanceService:
                 db.session.add(tracker)
             
             if is_present:
-                # Reset consecutive absences
+                # IMPORTANT: Reset consecutive absences when present
                 tracker.consecutive_absences = 0
                 tracker.last_present_date = today
                 tracker.notification_sent = False
+                logger.info(f"Reset absence counter for student_id={student_id}")
             else:
                 # Increment consecutive absences
                 tracker.consecutive_absences += 1
+                logger.info(f"Incremented absence counter for student_id={student_id}: {tracker.consecutive_absences} days")
             
             db.session.commit()
             
@@ -133,11 +134,15 @@ class AttendanceService:
 
     def check_absence_patterns(self):
         """
-        Check for consecutive absences and send alerts
+        Check for consecutive absences and send WhatsApp alerts
         This should be run daily (e.g., via cron job or scheduler)
+        
+        ENHANCED: Sends WhatsApp alerts to both student and coordinator
         """
         try:
             today = self.get_current_date()
+            
+            logger.info(f"Running absence check for date: {today}")
             
             # Get all active students
             students = Student.query.filter_by(status='active').all()
@@ -151,7 +156,7 @@ class AttendanceService:
                 ).first()
                 
                 if not attendance_today:
-                    # Mark as absent
+                    # Mark as absent (increment counter)
                     self.update_absence_tracker(student.id, is_present=False)
                 
                 # Get tracker
@@ -161,7 +166,10 @@ class AttendanceService:
                     # Check if notification already sent recently
                     if not tracker.notification_sent or (tracker.last_notification_date and 
                                                          (today - tracker.last_notification_date).days >= 7):
-                        # Send absence alert
+                        
+                        logger.warning(f"🚨 ALERT: {student.name} has {tracker.consecutive_absences} consecutive absences")
+                        
+                        # Send WhatsApp alerts
                         self.send_absence_notification(student, tracker.consecutive_absences)
                         
                         # Update tracker
@@ -169,7 +177,7 @@ class AttendanceService:
                         tracker.last_notification_date = today
                         db.session.commit()
                         
-                        logger.info(f"Absence notification sent for {student.name} ({tracker.consecutive_absences} days)")
+                        logger.info(f"✅ Absence notification sent for {student.name} ({tracker.consecutive_absences} days)")
             
         except Exception as e:
             logger.error(f"Error checking absence patterns: {e}")
@@ -177,7 +185,8 @@ class AttendanceService:
 
     def send_absence_notification(self, student, consecutive_days):
         """
-        Send WhatsApp notification for consecutive absences
+        Send WhatsApp notification to both student and coordinator
+        for consecutive absences (3+ days)
         """
         try:
             # Calculate attendance percentage
@@ -189,45 +198,74 @@ class AttendanceService:
             
             attendance_percentage = round((present_days / total_days * 100) if total_days > 0 else 0, 1)
             
-            # Message content
-            message = (
-                f"⚠️ Absence Alert\n\n"
-                f"Student: {student.name}\n"
+            # Message for parent/student
+            student_message = (
+                f"⚠️ *Attendance Alert*\n\n"
+                f"Dear Parent/Guardian,\n\n"
+                f"This is to inform you that *{student.name}* "
+                f"(ID: {student.student_id}) has been absent for "
+                f"*{consecutive_days} consecutive days*.\n\n"
+                f"Class: {student.class_name}-{student.section}\n"
+                f"Overall Attendance: {attendance_percentage}%\n\n"
+                f"Please contact the school if there are any concerns.\n\n"
+                f"Thank you,\n"
+                f"School Administration"
+            )
+            
+            # Message for coordinator
+            coordinator_message = (
+                f"🚨 *Absence Alert - Action Required*\n\n"
+                f"Student: *{student.name}*\n"
                 f"ID: {student.student_id}\n"
                 f"Class: {student.class_name}-{student.section}\n\n"
-                f"Consecutive Absences: {consecutive_days} days\n"
-                f"Overall Attendance: {attendance_percentage}%\n\n"
-                f"Please contact the school if there are any concerns."
+                f"❌ Consecutive Absences: *{consecutive_days} days*\n"
+                f"📊 Overall Attendance: {attendance_percentage}%\n"
+                f"📞 Parent Contact: {student.parent_phone}\n\n"
+                f"Please follow up with the student/parent."
             )
             
             # Send to parent
             if student.parent_phone:
-                result_parent = self.whatsapp.send_absence_alert(
-                    student.parent_phone,
-                    student.name,
-                    consecutive_days
-                )
-                logger.info(f"Parent notification sent: {result_parent}")
+                try:
+                    result_parent = self.whatsapp.send_message(
+                        student.parent_phone,
+                        student_message
+                    )
+                    if result_parent:
+                        logger.info(f"✅ Parent WhatsApp sent to {student.parent_phone}")
+                    else:
+                        logger.error(f"❌ Failed to send WhatsApp to parent {student.parent_phone}")
+                except Exception as e:
+                    logger.error(f"Error sending WhatsApp to parent: {e}")
             
             # Send to coordinator
-            result_coordinator = self.whatsapp.send_message(
-                Config.CLASS_COORDINATOR_PHONE,
-                message
-            )
-            logger.info(f"Coordinator notification sent: {result_coordinator}")
+            try:
+                result_coordinator = self.whatsapp.send_message(
+                    Config.CLASS_COORDINATOR_PHONE,
+                    coordinator_message
+                )
+                if result_coordinator:
+                    logger.info(f"✅ Coordinator WhatsApp sent to {Config.CLASS_COORDINATOR_PHONE}")
+                else:
+                    logger.error(f"❌ Failed to send WhatsApp to coordinator")
+            except Exception as e:
+                logger.error(f"Error sending WhatsApp to coordinator: {e}")
             
-            # Log alert
+            # Log alert in database
             alert = Alert(
                 student_id=student.id,
                 alert_type='consecutive_absence',
-                message=message,
+                message=student_message,
                 sent=True
             )
             db.session.add(alert)
             db.session.commit()
             
+            logger.info(f"✅ Absence alert logged for {student.name}")
+            
         except Exception as e:
             logger.error(f"Error sending absence notification: {e}")
+            db.session.rollback()
 
     def reset_daily_attendance(self):
         """
@@ -235,8 +273,42 @@ class AttendanceService:
         This ensures absence tracking is updated daily
         """
         try:
-            logger.info("Running daily attendance reset...")
+            logger.info("=" * 60)
+            logger.info("RUNNING DAILY ATTENDANCE RESET")
+            logger.info("=" * 60)
+            
+            # Check absence patterns and send alerts
             self.check_absence_patterns()
-            logger.info("Daily reset completed")
+            
+            logger.info("Daily reset completed successfully")
+            logger.info("=" * 60)
+            
         except Exception as e:
             logger.error(f"Error in daily reset: {e}")
+
+    def test_whatsapp_service(self):
+        """
+        Test WhatsApp service with a sample message
+        Returns: (success: bool, message: str)
+        """
+        try:
+            test_message = (
+                "🧪 *Test Message*\n\n"
+                "This is a test message from the Smart Attendance System.\n\n"
+                "If you received this, WhatsApp integration is working correctly!\n\n"
+                f"Timestamp: {datetime.now(IST).strftime('%Y-%m-%d %I:%M:%S %p IST')}"
+            )
+            
+            result = self.whatsapp.send_message(
+                Config.CLASS_COORDINATOR_PHONE,
+                test_message
+            )
+            
+            if result:
+                return True, "Test message sent successfully!"
+            else:
+                return False, "Failed to send test message. Check WhatsApp configuration."
+                
+        except Exception as e:
+            logger.error(f"Error testing WhatsApp service: {e}")
+            return False, f"Error: {str(e)}"

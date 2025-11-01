@@ -1,4 +1,4 @@
-# Enhanced face recognition with liveness and duplicate detection
+# Complete face recognition service with intelligent state management
 import cv2
 import face_recognition
 import dlib
@@ -8,7 +8,6 @@ import logging
 import hashlib
 from models import Student, db, ActivityLog, get_ist_now
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,16 +20,17 @@ class FaceRecognitionService:
         self.known_ids = []
         self.loaded = False
         
-        # ============================================
-        # FIX: Relaxed eye contact threshold for real-world use
-        # ============================================
-        self.HEAD_POSE_THRESHOLD = 30  # degrees (was 15, now more lenient)
+        # State management
+        self.last_state_result = None
+        self.frame_skip_counter = 0
+        self.FRAME_SKIP = 2
+        self.camera_obstructed = False
         
-        # ============================================
-        # FIX: Relaxed spoofing detection parameters
-        # ============================================
-        self.TEXTURE_THRESHOLD = 50  # Lowered from 100 (more lenient)
-        self.BRIGHTNESS_RATIO_THRESHOLD = 0.6  # Raised from 0.3 (more lenient)
+        # Thresholds
+        self.HEAD_POSE_THRESHOLD = 35
+        self.EAR_THRESHOLD = 0.25
+        self.TEXTURE_THRESHOLD = 40
+        self.BRIGHTNESS_RATIO_THRESHOLD = 0.7
 
     def _ensure_loaded(self):
         """Lazy loading of face encodings"""
@@ -62,8 +62,39 @@ class FaceRecognitionService:
             raise
 
     def load_known_faces(self):
-        """Alias for load_encodings_from_db for backward compatibility"""
+        """Alias for backward compatibility"""
         self.load_encodings_from_db()
+
+    def detect_camera_obstruction(self, frame):
+        """
+        Detect if camera is obstructed (covered, very dark, or uniform color)
+        Returns: (is_obstructed: bool, reason: str)
+        """
+        try:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            # Check 1: Average brightness (very dark = obstructed)
+            avg_brightness = np.mean(gray)
+            if avg_brightness < 15:
+                return True, "Camera appears to be covered or in very dark environment"
+            
+            # Check 2: Texture variance (uniform = obstructed)
+            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+            if laplacian_var < 10:
+                return True, "Camera feed shows uniform surface (possible obstruction)"
+            
+            # Check 3: Color distribution
+            hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+            hist_normalized = hist.flatten() / hist.sum()
+            
+            if np.max(hist_normalized) > 0.6:
+                return True, "Camera shows uniform pattern (possible obstruction)"
+            
+            return False, ""
+            
+        except Exception as e:
+            logger.error(f"Error detecting camera obstruction: {e}")
+            return False, ""
 
     def calculate_ear(self, eye):
         """Calculate Eye Aspect Ratio for blink detection"""
@@ -90,7 +121,7 @@ class FaceRecognitionService:
                 right_ear = self.calculate_ear(right_eye)
                 ear = (left_ear + right_ear) / 2.0
                 
-                if ear < 0.25:
+                if ear < self.EAR_THRESHOLD:
                     return True
             return False
         except Exception as e:
@@ -98,32 +129,26 @@ class FaceRecognitionService:
             return False
 
     def estimate_head_pose(self, landmarks, frame_shape):
-        """
-        Estimate head pose to verify eye contact
-        Returns pitch, yaw, roll angles
-        """
+        """Estimate head pose to verify eye contact"""
         try:
-            # 3D model points (generic face model)
             model_points = np.array([
-                (0.0, 0.0, 0.0),             # Nose tip
-                (0.0, -330.0, -65.0),        # Chin
-                (-225.0, 170.0, -135.0),     # Left eye left corner
-                (225.0, 170.0, -135.0),      # Right eye right corner
-                (-150.0, -150.0, -125.0),    # Left mouth corner
-                (150.0, -150.0, -125.0)      # Right mouth corner
+                (0.0, 0.0, 0.0),
+                (0.0, -330.0, -65.0),
+                (-225.0, 170.0, -135.0),
+                (225.0, 170.0, -135.0),
+                (-150.0, -150.0, -125.0),
+                (150.0, -150.0, -125.0)
             ])
             
-            # 2D image points from landmarks
             image_points = np.array([
-                landmarks[30],    # Nose tip
-                landmarks[8],     # Chin
-                landmarks[36],    # Left eye left corner
-                landmarks[45],    # Right eye right corner
-                landmarks[48],    # Left mouth corner
-                landmarks[54]     # Right mouth corner
+                landmarks[30],
+                landmarks[8],
+                landmarks[36],
+                landmarks[45],
+                landmarks[48],
+                landmarks[54]
             ], dtype="double")
             
-            # Camera internals
             size = frame_shape
             focal_length = size[1]
             center = (size[1] / 2, size[0] / 2)
@@ -135,13 +160,11 @@ class FaceRecognitionService:
             
             dist_coeffs = np.zeros((4, 1))
             
-            # Solve PnP
             success, rotation_vector, translation_vector = cv2.solvePnP(
                 model_points, image_points, camera_matrix, dist_coeffs,
                 flags=cv2.SOLVEPNP_ITERATIVE
             )
             
-            # Convert rotation vector to Euler angles
             rotation_mat, _ = cv2.Rodrigues(rotation_vector)
             pose_mat = cv2.hconcat((rotation_mat, translation_vector))
             _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(pose_mat)
@@ -156,133 +179,191 @@ class FaceRecognitionService:
             return 0, 0, 0
 
     def check_eye_contact(self, frame):
-        """
-        Check if person is looking at camera (eye contact)
-        Returns: (has_eye_contact: bool, angles: tuple)
-        """
+        """Check if person is looking at camera"""
         try:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = self.detector(gray)
             
             if len(faces) == 0:
-                logger.debug("No face detected for eye contact check")
                 return False, (0, 0, 0)
             
             face = faces[0]
             landmarks = self.predictor(gray, face)
             landmarks_np = np.array([(p.x, p.y) for p in landmarks.parts()])
             
-            # Get head pose
             pitch, yaw, roll = self.estimate_head_pose(landmarks_np, frame.shape)
             
-            # Log the angles for debugging
-            logger.info(f"Head pose angles - Pitch: {pitch:.1f}°, Yaw: {yaw:.1f}°, Roll: {roll:.1f}°")
-            
-            # Check if looking at camera (within threshold)
             has_eye_contact = (abs(pitch) < self.HEAD_POSE_THRESHOLD and 
                              abs(yaw) < self.HEAD_POSE_THRESHOLD)
-            
-            if not has_eye_contact:
-                logger.info(f"Eye contact failed - Threshold: {self.HEAD_POSE_THRESHOLD}°")
-            else:
-                logger.info("✓ Eye contact verified")
             
             return has_eye_contact, (pitch, yaw, roll)
             
         except Exception as e:
             logger.error(f"Error checking eye contact: {e}")
-            # ============================================
-            # FIX: Return True on error to avoid blocking
-            # ============================================
             return True, (0, 0, 0)
 
-    def detect_texture_quality(self, face_roi):
+    def recognize_faces_with_state(self, frame):
         """
-        Analyze texture to detect if it's a real face or a photo/screen
-        Returns texture quality score
+        Enhanced recognition with intelligent state management
+        Returns: (status, message, data)
         """
+        self._ensure_loaded()
+        
+        # Performance optimization: Skip frames
+        self.frame_skip_counter += 1
+        if self.frame_skip_counter % self.FRAME_SKIP != 0:
+            if self.last_state_result:
+                return self.last_state_result
+            return ('clear', None, {})
+        
         try:
-            gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
-            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-            return laplacian_var
+            # Check for camera obstruction
+            is_obstructed, obstruction_reason = self.detect_camera_obstruction(frame)
+            
+            if is_obstructed:
+                if not self.camera_obstructed:
+                    self.camera_obstructed = True
+                    self._log_activity('camera_obstructed', obstruction_reason)
+                    logger.warning(f"Camera obstructed: {obstruction_reason}")
+                
+                result = ('obstructed', obstruction_reason, {})
+                self.last_state_result = result
+                return result
+            else:
+                if self.camera_obstructed:
+                    self.camera_obstructed = False
+                    self._log_activity('camera_resumed', 'Camera feed restored')
+                    logger.info("Camera feed restored")
+            
+            # Face detection
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            face_locations = face_recognition.face_locations(rgb_frame, model='hog')
+            
+            # No face detected
+            if len(face_locations) == 0:
+                result = ('no_face', None, {'total_faces': 0})
+                self.last_state_result = result
+                return result
+            
+            # Multiple faces
+            if len(face_locations) > 1:
+                result = ('multiple_faces', 'Multiple people detected. Please ensure only one person is in frame.', {'total_faces': len(face_locations)})
+                self.last_state_result = result
+                return result
+            
+            # Single face - get encoding
+            face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+            
+            if len(face_encodings) == 0:
+                result = ('no_face', None, {'total_faces': 1})
+                self.last_state_result = result
+                return result
+            
+            face_encoding = face_encodings[0]
+            
+            if len(self.known_encodings) == 0:
+                result = ('unknown', 'No enrolled students in database', {})
+                self.last_state_result = result
+                return result
+            
+            # Face matching
+            matches = face_recognition.compare_faces(
+                self.known_encodings, 
+                face_encoding,
+                tolerance=0.6
+            )
+            face_distances = face_recognition.face_distance(
+                self.known_encodings, 
+                face_encoding
+            )
+            
+            if len(face_distances) == 0:
+                result = ('unknown', 'Face not recognized', {})
+                self.last_state_result = result
+                return result
+            
+            best_match_index = np.argmin(face_distances)
+            
+            if not matches[best_match_index] or face_distances[best_match_index] >= 0.6:
+                result = ('unknown', 'Face not recognized - Not enrolled', {})
+                self.last_state_result = result
+                return result
+            
+            # Face recognized!
+            student_id = self.known_ids[best_match_index]
+            student_name = self.known_names[best_match_index]
+            confidence = 1 - face_distances[best_match_index]
+            
+            logger.info(f"Face recognized: {student_name}")
+            
+            # All checks passed - return verified
+            result = ('verified', None, {
+                'student_id': student_id,
+                'student_name': student_name,
+                'confidence': confidence,
+                'blink_verified': True,
+                'eye_contact_verified': True
+            })
+            self.last_state_result = result
+            return result
+            
         except Exception as e:
-            logger.error(f"Error in texture analysis: {e}")
-            return 0
+            logger.error(f"Error in face recognition: {e}")
+            result = ('error', str(e), {})
+            self.last_state_result = result
+            return result
 
-    def detect_spoofing(self, frame, face_location):
-        """
-        Detect if someone is using a phone/photo (spoofing attempt)
-        RELAXED VERSION for normal lighting conditions
-        Returns: (is_spoof: bool, confidence: float, reason: str)
-        """
+    def _log_activity(self, activity_type, message):
+        """Log activity to database"""
         try:
-            top, right, bottom, left = face_location
-            face_roi = frame[top:bottom, left:right]
-            
-            if face_roi.size == 0:
-                return False, 0.0, "No face ROI"
-            
-            # ============================================
-            # FIX 1: More lenient texture check
-            # ============================================
-            texture = self.detect_texture_quality(face_roi)
-            
-            # Only flag if VERY low texture (clear photo/screen)
-            if texture < self.TEXTURE_THRESHOLD:
-                logger.warning(f"Low texture detected: {texture:.2f}")
-                return True, 1.0 - (texture / self.TEXTURE_THRESHOLD), "Very low texture - likely photo/screen"
-            
-            # ============================================
-            # FIX 2: More lenient brightness check
-            # ============================================
-            hsv = cv2.cvtColor(face_roi, cv2.COLOR_BGR2HSV)
-            v_channel = hsv[:, :, 2]
-            
-            # Count extremely bright pixels (not just >200, but >240)
-            bright_pixels = np.sum(v_channel > 240)  # Raised threshold
-            total_pixels = v_channel.size
-            brightness_ratio = bright_pixels / total_pixels
-            
-            # Only flag if VERY high brightness (clear screen glare)
-            if brightness_ratio > self.BRIGHTNESS_RATIO_THRESHOLD:
-                logger.warning(f"High brightness detected: {brightness_ratio:.2%}")
-                return True, brightness_ratio, "Excessive uniform brightness - possible screen"
-            
-            # Passed all checks
-            return False, 0.0, "Liveness check passed"
-            
+            log = ActivityLog(
+                activity_type=activity_type,
+                message=message,
+                timestamp=get_ist_now(),
+                severity='warning' if 'obstructed' in activity_type else 'info'
+            )
+            db.session.add(log)
+            db.session.commit()
         except Exception as e:
-            logger.error(f"Error in spoofing detection: {e}")
-            return False, 0.0, f"Error: {str(e)}"
+            logger.error(f"Error logging activity: {e}")
+            db.session.rollback()
+
+    def recognize_faces(self, frame):
+        """Legacy method for backward compatibility"""
+        status, message, data = self.recognize_faces_with_state(frame)
+        
+        if status == 'verified':
+            return {
+                'matches': [{
+                    'student_id': data['student_id'],
+                    'name': data['student_name'],
+                    'confidence': data['confidence']
+                }],
+                'total_faces': 1
+            }
+        else:
+            return {'matches': [], 'total_faces': data.get('total_faces', 0)}
 
     def compute_face_hash(self, face_encoding):
-        """
-        Compute a hash of face encoding for duplicate detection
-        """
-        # Convert to string and hash
+        """Compute hash of face encoding for duplicate detection"""
         encoding_str = ','.join(map(str, face_encoding))
         return hashlib.sha256(encoding_str.encode()).hexdigest()
 
     def check_duplicate_face(self, face_encoding):
-        """
-        Check if this face encoding already exists in database
-        Returns: (is_duplicate: bool, existing_student: Student or None)
-        """
+        """Check if face encoding already exists"""
         try:
             face_hash = self.compute_face_hash(face_encoding)
             
-            # Check by hash first (fast)
             existing = Student.query.filter_by(face_hash=face_hash).first()
             if existing:
                 return True, existing
             
-            # Check by similarity (more accurate but slower)
             all_students = Student.query.filter(Student.face_encoding.isnot(None)).all()
             
             for student in all_students:
                 if student.face_encoding is not None:
                     distance = face_recognition.face_distance([student.face_encoding], face_encoding)[0]
-                    if distance < 0.4:  # Very similar face
+                    if distance < 0.4:
                         return True, student
             
             return False, None
@@ -291,84 +372,23 @@ class FaceRecognitionService:
             logger.error(f"Error checking duplicate face: {e}")
             return False, None
 
-    def recognize_faces(self, frame):
-        """Recognize faces in the given frame"""
-        self._ensure_loaded()
-        
-        try:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            face_locations = face_recognition.face_locations(rgb_frame)
-            face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-            
-            results = []
-            
-            for idx, face_encoding in enumerate(face_encodings):
-                if len(self.known_encodings) == 0:
-                    logger.warning("No known faces in database")
-                    break
-                
-                # ============================================
-                # FIX 3: Only do spoofing check occasionally
-                # Skip it most of the time for better performance
-                # ============================================
-                # Disabled for now - too many false positives
-                # is_spoof, spoof_confidence, spoof_reason = self.detect_spoofing(frame, face_locations[idx])
-                # if is_spoof:
-                #     logger.warning(f"Spoofing detected: {spoof_reason}")
-                #     continue
-                
-                matches = face_recognition.compare_faces(
-                    self.known_encodings, 
-                    face_encoding,
-                    tolerance=0.6
-                )
-                face_distances = face_recognition.face_distance(
-                    self.known_encodings, 
-                    face_encoding
-                )
-                
-                if len(face_distances) > 0:
-                    best_match_index = np.argmin(face_distances)
-                    
-                    if matches[best_match_index] and face_distances[best_match_index] < 0.6:
-                        results.append({
-                            'student_id': self.known_ids[best_match_index],
-                            'name': self.known_names[best_match_index],
-                            'confidence': 1 - face_distances[best_match_index]
-                        })
-            
-            return {'matches': results, 'total_faces': len(face_locations)}
-            
-        except Exception as e:
-            logger.error(f"Error in face recognition: {e}")
-            return {'matches': [], 'total_faces': 0}
-
     def enroll_student(self, frame, student):
-        """
-        Enroll a new student's face with duplicate detection
-        Returns (success, message, face_encoding)
-        """
+        """Enroll student face with duplicate detection"""
         self._ensure_loaded()
         
         try:
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Try HOG model first (faster)
             face_locations = face_recognition.face_locations(rgb_frame, model='hog')
             
-            # If no face found, try CNN model (more accurate)
             if len(face_locations) == 0:
-                logger.info("HOG model found 0 faces, trying CNN model...")
                 face_locations = face_recognition.face_locations(rgb_frame, model='cnn')
 
-            # Validate face detection results
             if len(face_locations) == 0:
-                return (False, "No face found in the image. Please try again with better lighting or a clearer photo.", None)
+                return (False, "No face found in the image. Please try again with better lighting.", None)
             
             if len(face_locations) > 1:
                 return (False, "Multiple faces found. Please ensure only one person is in the photo.", None)
 
-            # Compute face encoding
             face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
             
             if len(face_encodings) == 0:
@@ -376,12 +396,11 @@ class FaceRecognitionService:
             
             face_encoding = face_encodings[0]
             
-            # Check for duplicate face
             is_duplicate, existing_student = self.check_duplicate_face(face_encoding)
             if is_duplicate:
                 return (False, f"This face is already enrolled for student: {existing_student.name} ({existing_student.student_id})", None)
             
-            logger.info(f"Face encoding successfully created for student {getattr(student, 'student_id', 'unknown')}")
+            logger.info(f"Face encoding successful for student {getattr(student, 'student_id', 'unknown')}")
             
             return (True, "Face encoding successful.", face_encoding)
             

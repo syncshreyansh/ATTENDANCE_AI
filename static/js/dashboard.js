@@ -1,4 +1,4 @@
-// Enhanced dashboard with new UI structure and fixed camera stop
+// Enhanced dashboard with intelligent notification system and camera obstruction detection
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -54,6 +54,11 @@ class AttendanceDashboard {
     this.processingInterval = null;
     this.processingCanvas = null;
     this.cameraStopRequested = false;
+    
+    // Notification state management
+    this.currentNotificationState = null;
+    this.lastNotificationTime = 0;
+    this.notificationDebounce = 1000; // 1 second debounce
 
     // Cache DOM elements
     this.captureBtn = document.getElementById("capturePhoto");
@@ -83,8 +88,8 @@ class AttendanceDashboard {
     this.recentEventsList = document.getElementById("recentEvents");
 
     this.processingCanvas = document.createElement('canvas');
-    this.processingCanvas.width = 640;
-    this.processingCanvas.height = 480;
+    this.processingCanvas.width = 320;  // Reduced for better performance
+    this.processingCanvas.height = 240;
 
     this.initializeEventListeners();
     this.loadInitialData();
@@ -117,19 +122,9 @@ class AttendanceDashboard {
       e.target.value = e.target.value.replace(/\D/g, '');
     });
 
-    // SocketIO Listeners
+    // SocketIO Listeners with intelligent state handling
     this.socket.on("recognition_status", (data) => {
-      if (data.status === "clear") {
-        this.showOverlay(null);
-      } else if (data.status === "unknown") {
-        this.showOverlay(data.message, "error");
-      } else if (data.status === "recognizing" || data.status === "verifying") {
-        this.showOverlay(data.message, "recognizing");
-      } else if (data.status === "already_marked") {
-        this.showOverlay(data.message, "error");
-      } else if (data.status === "cooldown") {
-        this.showOverlay(data.message, "error");
-      }
+      this.handleRecognitionStatus(data);
     });
 
     this.socket.on("attendance_update", (data) => {
@@ -137,8 +132,72 @@ class AttendanceDashboard {
       this.handleAttendanceUpdate(data);
     });
     
+    this.socket.on("recent_event", (data) => {
+      this.handleRecentEvent(data);
+    });
+    
     this.socket.on("system_started", () => this.updateSystemStatus(true));
     this.socket.on("system_stopped", () => this.updateSystemStatus(false));
+  }
+
+  handleRecognitionStatus(data) {
+    const now = Date.now();
+    
+    // Debounce rapid state changes
+    if (now - this.lastNotificationTime < this.notificationDebounce && 
+        data.status === this.currentNotificationState) {
+      return;
+    }
+    
+    this.lastNotificationTime = now;
+    this.currentNotificationState = data.status;
+    
+    switch(data.status) {
+      case 'clear':
+        this.showOverlay(null);
+        break;
+        
+      case 'obstructed':
+        this.showOverlay('⚠️ Camera is obstructed - Please remove obstruction', 'error', 10000);
+        break;
+        
+      case 'unknown':
+        this.showOverlay(data.message || 'Face not recognized', 'error', 3000);
+        break;
+        
+      case 'verifying':
+        // This handles both gaze and blink verification
+        this.showOverlay(data.message, 'recognizing', 5000);
+        break;
+        
+      case 'already_marked':
+        this.showOverlay(data.message, 'error', 3000);
+        break;
+        
+      case 'cooldown':
+        this.showOverlay(data.message, 'error', 2000);
+        break;
+        
+      case 'error':
+        this.showOverlay(data.message, 'error', 3000);
+        break;
+    }
+  }
+
+  handleRecentEvent(data) {
+    const eventMessages = {
+      'camera_obstructed': '🚫 Camera feed obstructed',
+      'camera_resumed': '✅ Camera feed restored'
+    };
+    
+    const message = eventMessages[data.type] || data.message;
+    
+    this.addRecentEvent({
+      student_name: message,
+      time_in: data.timestamp
+    });
+    
+    console.log(`📋 Event logged: ${message}`);
   }
 
   // === Video Stream Methods ===
@@ -207,13 +266,9 @@ class AttendanceDashboard {
   stopLiveFeed() {
     console.log('=== STOPPING LIVE FEED ===');
     
-    // Set stop flag immediately
     this.cameraStopRequested = true;
-    
-    // Stop frame processing first
     this.stopFrameProcessing();
 
-    // Stop all video tracks
     if (this.liveStream) {
       console.log('Stopping media stream tracks...');
       const tracks = this.liveStream.getTracks();
@@ -225,23 +280,18 @@ class AttendanceDashboard {
       console.log('All tracks stopped');
     }
     
-    // Clear video element
     if (this.liveFeedVideo) {
       console.log('Clearing video element...');
       this.liveFeedVideo.srcObject = null;
       this.liveFeedVideo.style.display = "none";
       this.liveFeedVideo.pause();
-      
-      // Force browser to release resources
       this.liveFeedVideo.load();
     }
     
-    // Show placeholder
     if (this.feedPlaceholder) {
       this.feedPlaceholder.style.display = "flex";
     }
     
-    // Clear overlay
     this.showOverlay(null);
     
     console.log('=== LIVE FEED STOPPED SUCCESSFULLY ===');
@@ -254,11 +304,12 @@ class AttendanceDashboard {
     }
     
     console.log('Starting frame processing...');
+    // Reduced to 333ms (3 FPS) for better performance
     this.processingInterval = setInterval(() => {
       if (!this.cameraStopRequested && this.isSystemRunning) {
         this.captureAndSendFrame();
       }
-    }, 500);
+    }, 333);
   }
 
   stopFrameProcessing() {
@@ -285,7 +336,8 @@ class AttendanceDashboard {
         this.processingCanvas.height
       );
 
-      const frameData = this.processingCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      // Reduced quality to 0.7 for faster processing
+      const frameData = this.processingCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
       this.socket.emit('process_frame', { frame: frameData });
     } catch (error) {
       console.error('Error capturing frame:', error);
@@ -434,7 +486,6 @@ class AttendanceDashboard {
     this.stopBtn.disabled = true;
     this.startBtn.disabled = false;
     
-    // Force immediate camera stop
     this.stopLiveFeed();
   }
 
@@ -463,7 +514,7 @@ class AttendanceDashboard {
   handleAttendanceUpdate(data) {
     playSuccessSound();
     
-    this.showOverlay(`${data.student_name} Marked!`, "success");
+    this.showOverlay(`✅ ${data.student_name} Marked!`, "success", 3000);
 
     this.showNotification(
       `${data.student_name} marked present! (+${data.points} points)`,
@@ -652,7 +703,7 @@ class AttendanceDashboard {
 
   // === Helper & UI Methods ===
 
-  showOverlay(message, type) {
+  showOverlay(message, type, duration = 2000) {
     clearTimeout(this.overlayTimeout);
 
     if (!message) {
@@ -667,7 +718,7 @@ class AttendanceDashboard {
 
     this.overlayTimeout = setTimeout(() => {
       this.recognitionOverlay.classList.remove("show");
-    }, 2000);
+    }, duration);
   }
 
   addRecentEvent(data) {
@@ -686,9 +737,14 @@ class AttendanceDashboard {
       time = this.formatTime(new Date(time).getTime() / 1000);
     }
 
-    item.innerHTML = `<span class="time">[${time || "Just now"}]</span> ${data.student_name} - Marked present`;
+    item.innerHTML = `<span class="time">[${time || "Just now"}]</span> ${data.student_name}`;
 
     this.recentEventsList.prepend(item);
+    
+    // Keep only last 20 events
+    while (this.recentEventsList.children.length > 20) {
+      this.recentEventsList.removeChild(this.recentEventsList.lastChild);
+    }
   }
 
   formatTime(timestamp) {
