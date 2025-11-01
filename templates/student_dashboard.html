@@ -176,7 +176,7 @@
             font-weight: 700;
             overflow: hidden;
             position: relative;
-            border: 3px solid var(--color-accent);
+           
             box-shadow: 0 0 20px var(--color-accent-glow);
         }
 
@@ -357,7 +357,7 @@
         .leaderboard-item:hover {
             border-color: var(--color-accent);
             background: rgba(0, 224, 240, 0.05);
-            transform: scale(1.02); /* CHANGED: Scale instead of translateX */
+            /* transform: scale(1.02); CHANGED: Scale instead of translateX */
         }
 
         .leaderboard-item.current-user {
@@ -761,7 +761,7 @@
                     }
                     
                     item.innerHTML = `
-                        <div class="rank-badge ${rankClass}">${rankIcon}</div>
+                      
                         <div class="leaderboard-avatar">
                             ${avatarContent}
                             ${medalHtml}
