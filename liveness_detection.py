@@ -117,6 +117,57 @@ class LivenessDetector:
         
         return laplacian_var
     
+    def calculate_fft_moire(self, face_roi):
+        """Moiré pattern detection via FFT"""
+        from spoof_detection.ensemble_spoof import calculate_fft_moire
+        return calculate_fft_moire(face_roi)
+    
+    def reflection_in_eyes_score(self, face_roi):
+        """Eye reflection analysis"""
+        from spoof_detection.ensemble_spoof import reflection_in_eyes_score
+        return reflection_in_eyes_score(face_roi)
+    
+    def get_liveness_features(self, frame):
+        """
+        Extract structured liveness features for ensemble
+        Returns: dict with all liveness metrics
+        """
+        try:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = self.detector(gray)
+            
+            if len(faces) == 0:
+                return None
+            
+            face = faces[0]
+            landmarks = self.predictor(gray, face)
+            landmarks_np = np.array([(p.x, p.y) for p in landmarks.parts()])
+            
+            # Extract face ROI
+            x, y, w, h = face.left(), face.top(), face.width(), face.height()
+            face_roi = frame[y:y+h, x:x+w]
+            
+            # Compute features
+            left_eye = landmarks_np[42:48]
+            right_eye = landmarks_np[36:42]
+            ear = (self.calculate_ear(left_eye) + self.calculate_ear(right_eye)) / 2.0
+            
+            pitch, yaw, roll = self.estimate_head_pose(landmarks_np, frame.shape)
+            texture_var = cv2.Laplacian(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
+            moire = self.calculate_fft_moire(face_roi)
+            reflection = self.reflection_in_eyes_score(face_roi)
+            
+            return {
+                'ear': ear,
+                'head_pose': {'pitch': pitch, 'yaw': yaw, 'roll': roll},
+                'texture_variance': texture_var,
+                'moire_confidence': moire,
+                'reflection_score': reflection
+            }
+        except Exception as e:
+            logger.error(f"Error extracting liveness features: {e}")
+            return None
+    
     def comprehensive_liveness_check(self, frame):
         """
         Perform comprehensive liveness detection

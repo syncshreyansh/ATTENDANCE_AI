@@ -1,4 +1,4 @@
-# Complete main Flask application - working version
+# Complete main Flask application - working version with spoof detection
 from flask import Flask, redirect, url_for
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -54,6 +54,17 @@ socketio = SocketIO(
     async_mode='threading'
 )
 
+def broadcast_spoof_event(event_data):
+    """
+    Broadcast spoof detection event to all connected clients
+    event_data: {timestamp, student_id, name, status, spoof_type, confidence, details}
+    """
+    try:
+        socketio.emit('activity_update', event_data, namespace='/')
+        logger.info(f"Broadcasted spoof event: {event_data.get('spoof_type')}")
+    except Exception as e:
+        logger.error(f"Failed to broadcast event: {e}")
+
 class EnhancedCameraService:
     def __init__(self):
         self.is_running = False
@@ -92,7 +103,7 @@ class EnhancedCameraService:
         logger.info("Camera service stopped")
 
     def process_frame(self, frame_data):
-        """Process frame with intelligent state-based notifications"""
+        """Process frame with intelligent state-based notifications and spoof detection"""
         if not self.is_running:
             return {'status': 'system_stopped'}
         
@@ -136,6 +147,24 @@ class EnhancedCameraService:
             if status in ['verifying_gaze', 'verifying_blink']:
                 return {
                     'status': 'verifying',
+                    'message': message
+                }
+            
+            # Handle spoof detection results
+            if status in ['spoof_blocked', 'spoof_flagged']:
+                # Broadcast to frontend
+                broadcast_spoof_event({
+                    'timestamp': current_time,
+                    'student_id': data.get('student_id'),
+                    'name': data.get('student_name'),
+                    'status': data.get('status'),
+                    'spoof_type': data.get('spoof_type'),
+                    'spoof_confidence': data.get('spoof_confidence', data.get('confidence')),
+                    'details': data.get('evidence')
+                })
+                
+                return {
+                    'status': 'error',
                     'message': message
                 }
             

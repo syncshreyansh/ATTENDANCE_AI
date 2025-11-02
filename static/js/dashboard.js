@@ -1,4 +1,4 @@
-// Enhanced dashboard with intelligent notification system and camera obstruction detection
+// Enhanced dashboard with intelligent notification system and spoof detection
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -136,8 +136,45 @@ class AttendanceDashboard {
       this.handleRecentEvent(data);
     });
     
+    // NEW: Listen for spoof/activity updates
+    this.socket.on('activity_update', (data) => {
+      this.handleActivityUpdate(data);
+    });
+    
     this.socket.on("system_started", () => this.updateSystemStatus(true));
     this.socket.on("system_stopped", () => this.updateSystemStatus(false));
+  }
+
+  handleActivityUpdate(data) {
+    // data: {timestamp, student_id, name, status, spoof_type, spoof_confidence, details}
+    console.log('📊 Activity update:', data);
+    
+    const statusColors = {
+      'ok': 'green',
+      'flagged_for_review': 'yellow',
+      'blocked': 'red'
+    };
+    
+    const color = statusColors[data.status] || 'gray';
+    const badge = `<span style="background:${color}; padding:2px 8px; border-radius:4px; color:white; font-size:0.85rem;">${data.status}</span>`;
+    
+    let message = `${data.name || 'Unknown'} - ${badge}`;
+    if (data.spoof_type) {
+      message += ` <small style="color:var(--color-text-secondary);">(${data.spoof_type}, conf=${(data.spoof_confidence || 0).toFixed(2)})</small>`;
+    }
+    
+    this.addRecentEvent({
+      student_name: message,
+      time_in: data.timestamp
+    });
+    
+    // Show details on hover/expand (optional enhancement)
+    if (data.details) {
+      const lastItem = this.recentEventsList.firstChild;
+      if (lastItem) {
+        lastItem.title = JSON.stringify(data.details, null, 2);
+      }
+    }
   }
 
   handleRecognitionStatus(data) {

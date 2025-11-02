@@ -30,9 +30,6 @@ class Config:
     BLINK_CONSECUTIVE_FRAMES = 3
     REQUIRED_BLINKS = 1  # Must blink at least once
     
-    # ============================================
-    # FIX: Make eye contact optional during testing
-    # ============================================
     # Eye Contact Detection
     EYE_CONTACT_THRESHOLD = 30  # Degrees of head rotation allowed (relaxed from 15)
     REQUIRE_EYE_CONTACT = False  # Set to False for testing, True for production
@@ -40,6 +37,15 @@ class Config:
     # Liveness Detection
     TEXTURE_QUALITY_THRESHOLD = 50  # Lowered threshold (was 100)
     LIVENESS_CONFIDENCE_THRESHOLD = 0.6
+    
+    # Anti-Spoofing Settings
+    AUTO_BLOCK_SPOOF = os.environ.get('AUTO_BLOCK_SPOOF', 'False').lower() == 'true'
+    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.7
+    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.93
+    
+    # Model paths
+    ANTI_SPOOF_CNN_MODEL = 'models/anti_spoof_resnet18.onnx'
+    PHONE_DETECTOR_MODEL = 'models/yolov5n.pt'
     
     # WhatsApp API
     WHATSAPP_TOKEN = os.environ.get('WHATSAPP_TOKEN')

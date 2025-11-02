@@ -47,6 +47,18 @@ def migrate_database():
                     conn.commit()
                 logger.info("✓ eye_contact_verified column added")
             
+            # Check ActivityLog table for new spoof fields
+            activity_columns = [col['name'] for col in inspector.get_columns('activity_logs')]
+            
+            if 'spoof_type' not in activity_columns:
+                logger.info("Adding spoof detection columns to activity_logs...")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE activity_logs ADD COLUMN spoof_type VARCHAR(100)'))
+                    conn.execute(text('ALTER TABLE activity_logs ADD COLUMN spoof_confidence FLOAT'))
+                    conn.execute(text('ALTER TABLE activity_logs ADD COLUMN detection_details TEXT'))
+                    conn.commit()
+                logger.info("✓ Spoof detection columns added to activity_logs")
+            
             # Ensure parent_phone is not null (for existing records, set a default)
             logger.info("Checking parent_phone constraints...")
             with db.engine.connect() as conn:

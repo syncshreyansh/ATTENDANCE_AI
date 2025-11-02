@@ -42,16 +42,21 @@ class Attendance(db.Model):
     points_earned = db.Column(db.Integer, default=0)
 
 class ActivityLog(db.Model):
-    """New table to log suspicious activities and proxy attempts"""
+    """Enhanced table with spoof detection fields"""
     __tablename__ = 'activity_logs'
     
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=True)
     name = db.Column(db.String(100), nullable=True)
-    activity_type = db.Column(db.String(50), nullable=False)  # 'camera_covered', 'proxy_attempt', 'phone_detected', etc.
+    activity_type = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     message = db.Column(db.Text, nullable=False)
-    severity = db.Column(db.String(20), default='warning')  # 'info', 'warning', 'critical'
+    severity = db.Column(db.String(20), default='warning')
+    
+    # NEW FIELDS FOR SPOOF DETECTION
+    spoof_type = db.Column(db.String(100), nullable=True)  # comma-separated or JSON string
+    spoof_confidence = db.Column(db.Float, nullable=True)
+    detection_details = db.Column(db.Text, nullable=True)  # JSON string with evidence
 
 class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)

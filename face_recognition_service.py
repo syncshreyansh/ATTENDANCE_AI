@@ -1,4 +1,4 @@
-# Complete face recognition service with intelligent state management
+# Complete face recognition service with intelligent state management and spoof detection
 import cv2
 import face_recognition
 import dlib
@@ -7,6 +7,9 @@ from scipy.spatial import distance as dist
 import logging
 import hashlib
 from models import Student, db, ActivityLog, get_ist_now
+from datetime import datetime
+import pytz
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -204,7 +207,7 @@ class FaceRecognitionService:
 
     def recognize_faces_with_state(self, frame):
         """
-        Enhanced recognition with intelligent state management
+        Enhanced recognition with intelligent state management and spoof detection
         Returns: (status, message, data)
         """
         self._ensure_loaded()
@@ -296,6 +299,68 @@ class FaceRecognitionService:
             
             logger.info(f"Face recognized: {student_name}")
             
+            # === SPOOF DETECTION CHECK ===
+            try:
+                from spoof_detection.ensemble_spoof import check as spoof_check
+                from config import Config
+                
+                # Convert face location to bbox (x, y, w, h)
+                top, right, bottom, left = face_locations[0]
+                face_bbox_xywh = (left, top, right - left, bottom - top)
+                
+                spoof_result = spoof_check(frame, face_bbox_xywh, face_encoding)
+                
+                if spoof_result['is_spoof']:
+                    spoof_conf = spoof_result['confidence']
+                    spoof_type = spoof_result['spoof_type']
+                    evidence = spoof_result['evidence']
+                    
+                    # Get timezone for logging
+                    IST = pytz.timezone('Asia/Kolkata')
+                    
+                    # Log to terminal
+                    logger.warning(
+                        f"[{datetime.now(IST).isoformat()}] SPOOF_DETECTED "
+                        f"student_id={student_id} name=\"{student_name}\" "
+                        f"spoof_type={spoof_type} confidence={spoof_conf:.2f} "
+                        f"evidence={evidence}"
+                    )
+                    
+                    # Log to database
+                    self._log_spoof_activity(student_id, student_name, spoof_type, spoof_conf, evidence)
+                    
+                    # Decide action based on config
+                    auto_block = getattr(Config, 'AUTO_BLOCK_SPOOF', False)
+                    
+                    if spoof_conf >= 0.93 and auto_block:
+                        result = ('spoof_blocked', f'Spoof detected: {spoof_type}', {
+                            'student_id': student_id,
+                            'student_name': student_name,
+                            'spoof_type': spoof_type,
+                            'confidence': spoof_conf,
+                            'status': 'blocked',
+                            'evidence': evidence
+                        })
+                    else:
+                        result = ('spoof_flagged', f'Potential spoof detected: {spoof_type}', {
+                            'student_id': student_id,
+                            'student_name': student_name,
+                            'confidence': confidence,
+                            'spoof_type': spoof_type,
+                            'spoof_confidence': spoof_conf,
+                            'status': 'flagged_for_review',
+                            'evidence': evidence
+                        })
+                    
+                    self.last_state_result = result
+                    return result
+                    
+            except Exception as e:
+                logger.error(f"Spoof detection error: {e}")
+                # Continue with normal recognition if spoof check fails
+            
+            # === END SPOOF CHECK ===
+            
             # All checks passed - return verified
             result = ('verified', None, {
                 'student_id': student_id,
@@ -326,6 +391,25 @@ class FaceRecognitionService:
             db.session.commit()
         except Exception as e:
             logger.error(f"Error logging activity: {e}")
+            db.session.rollback()
+
+    def _log_spoof_activity(self, student_id, student_name, spoof_type, confidence, evidence):
+        """Log spoof detection to ActivityLog"""
+        try:
+            log = ActivityLog(
+                student_id=student_id,
+                name=student_name,
+                activity_type='spoof_detected',
+                message=f"Spoof detected: {spoof_type} (conf={confidence:.2f})",
+                severity='critical' if confidence >= 0.93 else 'warning',
+                spoof_type=str(spoof_type) if spoof_type else None,
+                spoof_confidence=confidence,
+                detection_details=json.dumps(evidence)
+            )
+            db.session.add(log)
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Failed to log spoof activity: {e}")
             db.session.rollback()
 
     def recognize_faces(self, frame):
