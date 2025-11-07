@@ -1,4 +1,4 @@
-# Enhanced Flask API routes with strict validation
+# Enhanced Flask API routes with quality assessment endpoint
 from flask import Blueprint, request, jsonify, render_template
 from datetime import datetime, date
 import pytz
@@ -18,7 +18,6 @@ from config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create blueprint WITHOUT url_prefix (we'll add it in main.py)
 api = Blueprint('api', __name__)
 attendance_service = AttendanceService()
 face_service = FaceRecognitionService()
@@ -44,7 +43,6 @@ def validate_phone(phone):
     if not phone:
         return False, "Phone number is required"
     
-    # Remove any non-digit characters for validation
     digits_only = re.sub(r'\D', '', phone)
     
     if len(digits_only) < 10 or len(digits_only) > 15:
@@ -77,7 +75,6 @@ def students(current_user):
     """Student CRUD operations with enhanced validation"""
     if request.method == 'GET':
         try:
-            # Only admins can see all students
             if current_user.role != 'admin':
                 return jsonify({'success': False, 'message': 'Access denied'}), 403
             
@@ -97,13 +94,11 @@ def students(current_user):
             
     elif request.method == 'POST':
         try:
-            # Only admins can create students
             if current_user.role != 'admin':
                 return jsonify({'success': False, 'message': 'Access denied'}), 403
             
             data = request.json
             
-            # Validate required fields
             required_fields = ['name', 'student_id', 'class', 'section', 'parent_phone']
             for field in required_fields:
                 if field not in data or not data[field]:
@@ -112,22 +107,18 @@ def students(current_user):
                         'message': f'Missing required field: {field}'
                     }), 400
             
-            # Validate name (only alphabets)
             is_valid, msg = validate_name(data['name'])
             if not is_valid:
                 return jsonify({'success': False, 'message': msg}), 400
             
-            # Validate student ID
             is_valid, msg = validate_student_id(data['student_id'])
             if not is_valid:
                 return jsonify({'success': False, 'message': msg}), 400
             
-            # Validate phone number (only digits)
             is_valid, cleaned_phone = validate_phone(data['parent_phone'])
             if not is_valid:
                 return jsonify({'success': False, 'message': cleaned_phone}), 400
             
-            # Check for duplicate student_id
             existing_student = Student.query.filter_by(student_id=data['student_id']).first()
             if existing_student:
                 return jsonify({
@@ -135,7 +126,6 @@ def students(current_user):
                     'message': f"Student ID {data['student_id']} already exists"
                 }), 400
             
-            # Check for duplicate name + parent_phone combination
             duplicate_check = Student.query.filter_by(
                 name=data['name'].strip(),
                 parent_phone=cleaned_phone
@@ -146,7 +136,6 @@ def students(current_user):
                     'message': f"A student with name '{data['name']}' and this parent phone already exists"
                 }), 400
                 
-            # Create new student
             student = Student(
                 name=data['name'].strip(),
                 student_id=data['student_id'].strip(),
@@ -185,7 +174,6 @@ def attendance(current_user):
             else:
                 date_filter = datetime.now(IST).date()
             
-            # Filter by student if not admin
             if current_user.role == 'student':
                 if not current_user.student_id:
                     return jsonify({'success': False, 'message': 'Student ID not found'}), 400
@@ -230,7 +218,6 @@ def attendance(current_user):
 def stats(current_user):
     """Get attendance statistics"""
     try:
-        # Only admins see overall stats
         if current_user.role != 'admin':
             return jsonify({'success': False, 'message': 'Access denied'}), 403
         
@@ -306,6 +293,129 @@ def activity_logs(current_user):
         logger.error(f"Error fetching activity logs: {e}")
         return jsonify([])
 
+# ============================================
+# NEW: QUALITY ASSESSMENT ENDPOINT
+# ============================================
+@api.route('/api/assess-quality', methods=['POST'])
+@token_required
+def assess_quality(current_user):
+    """Assess frame quality for enrollment"""
+    try:
+        data = request.json
+        frame_data = data.get('frame')
+        
+        if not frame_data:
+            return jsonify({
+                'success': False,
+                'message': 'No frame data provided'
+            }), 400
+        
+        # Decode frame
+        frame_bytes = base64.b64decode(frame_data)
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return jsonify({
+                'success': False,
+                'has_face': False,
+                'feedback': {
+                    'status': 'poor',
+                    'message': 'Invalid frame data',
+                    'items': []
+                }
+            }), 200
+        
+        # Use face service's quality validation
+        import face_recognition
+        face_locations = face_recognition.face_locations(frame)
+        
+        if len(face_locations) == 0:
+            return jsonify({
+                'success': True,
+                'has_face': False,
+                'feedback': {
+                    'status': 'poor',
+                    'message': 'No face detected - position yourself in frame',
+                    'items': []
+                }
+            }), 200
+        
+        if len(face_locations) > 1:
+            return jsonify({
+                'success': True,
+                'has_face': False,
+                'feedback': {
+                    'status': 'poor',
+                    'message': 'Multiple faces detected - only one person allowed',
+                    'items': []
+                }
+            }), 200
+        
+        # Check quality
+        face_location = face_locations[0]
+        quality_valid, quality_msg = face_service.validate_face_quality(frame, face_location)
+        
+        # Calculate quality score and breakdown
+        top, right, bottom, left = face_location
+        face_roi = frame[top:bottom, left:right]
+        
+        # Brightness check
+        gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+        brightness = np.mean(gray)
+        brightness_score = 1.0 if 50 <= brightness <= 200 else (0.5 if 30 <= brightness <= 240 else 0.0)
+        brightness_feedback = "Good lighting" if brightness_score >= 0.7 else "Improve lighting"
+        
+        # Sharpness check
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        sharpness_score = 1.0 if laplacian_var >= 100 else (0.5 if laplacian_var >= 50 else 0.0)
+        sharpness_feedback = "Image is sharp" if sharpness_score >= 0.7 else "Hold camera steady"
+        
+        # Face size check
+        face_width = right - left
+        face_height = bottom - top
+        size_score = 1.0 if face_width >= 150 and face_height >= 150 else (0.5 if face_width >= 100 else 0.0)
+        size_feedback = "Face size good" if size_score >= 0.7 else "Move closer to camera"
+        
+        # Overall quality score
+        quality_score = (brightness_score + sharpness_score + size_score) / 3
+        
+        # Status determination
+        if quality_score >= 0.8:
+            status = 'excellent'
+            message = '✓ Perfect! Ready to capture'
+        elif quality_score >= 0.5:
+            status = 'good'
+            message = 'Good quality - you can capture'
+        else:
+            status = 'poor'
+            message = 'Adjust position for better quality'
+        
+        return jsonify({
+            'success': True,
+            'has_face': True,
+            'quality_score': quality_score,
+            'feedback': {
+                'status': status,
+                'message': message,
+                'items': [
+                    {'check': 'Lighting', 'score': brightness_score, 'feedback': brightness_feedback},
+                    {'check': 'Sharpness', 'score': sharpness_score, 'feedback': sharpness_feedback},
+                    {'check': 'Face Size', 'score': size_score, 'feedback': size_feedback}
+                ]
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in quality assessment: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Quality assessment error: {str(e)}'
+        }), 500
+
+# ============================================
+# ENROLLMENT ENDPOINTS
+# ============================================
 @api.route('/api/enroll', methods=['POST'])
 @admin_required
 def enroll_face(current_user):
@@ -317,7 +427,6 @@ def enroll_face(current_user):
     try:
         data = request.json
         
-        # Validate input
         if not data or 'student_id' not in data or 'frame' not in data:
             return jsonify({
                 'success': False,
@@ -329,7 +438,6 @@ def enroll_face(current_user):
         
         logger.info(f"Processing enrollment for student_id: {student_id_str}")
         
-        # Find student in database
         student = Student.query.filter_by(student_id=student_id_str).first()
         
         if not student:
@@ -338,14 +446,12 @@ def enroll_face(current_user):
                 'message': f'Student ID {student_id_str} not found'
             }), 404
         
-        # Check if already enrolled
         if student.face_encoding is not None:
             return jsonify({
                 'success': False,
                 'message': f'Student {student.name} is already enrolled. Please delete existing enrollment first.'
             }), 400
         
-        # Decode frame
         try:
             frame_bytes = base64.b64decode(frame_data)
             nparr = np.frombuffer(frame_bytes, np.uint8)
@@ -364,7 +470,6 @@ def enroll_face(current_user):
                 'message': f'Failed to decode image: {str(e)}'
             }), 400
         
-        # Enroll face (includes duplicate check)
         try:
             success, message, face_encoding = face_service.enroll_student(frame, student)
             
@@ -387,15 +492,12 @@ def enroll_face(current_user):
                 'message': f'Face encoding error: {str(e)}'
             }), 500
         
-        # Save to database
         try:
-            # Compute face hash for duplicate detection
             face_hash = face_service.compute_face_hash(face_encoding)
             
             student.face_encoding = face_encoding
             student.face_hash = face_hash
             
-            # Save image
             enroll_dir = os.path.join('static', 'enrollments')
             ensure_dir(enroll_dir)
             
@@ -407,7 +509,6 @@ def enroll_face(current_user):
             
             db.session.commit()
             
-            # Reload encodings
             face_service.load_encodings_from_db()
             
             logger.info(f"✓ Enrollment successful for {student.name}")
@@ -432,6 +533,102 @@ def enroll_face(current_user):
             'message': f'Unexpected error: {str(e)}'
         }), 500
 
+# ============================================
+# NEW: MULTI-SHOT ENROLLMENT ENDPOINT
+# ============================================
+@api.route('/api/enroll-multishot', methods=['POST'])
+@admin_required
+def enroll_multishot(current_user):
+    """Enroll student using multiple frames for better accuracy"""
+    try:
+        data = request.json
+        
+        if not data or 'student_id' not in data or 'frames' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'Missing required data (student_id or frames)'
+            }), 400
+        
+        student_id_str = data['student_id']
+        frames_data = data['frames']
+        
+        if not isinstance(frames_data, list) or len(frames_data) < 3:
+            return jsonify({
+                'success': False,
+                'message': 'At least 3 frames required for enrollment'
+            }), 400
+        
+        logger.info(f"Processing multi-shot enrollment for {student_id_str} with {len(frames_data)} frames")
+        
+        student = Student.query.filter_by(student_id=student_id_str).first()
+        
+        if not student:
+            return jsonify({
+                'success': False,
+                'message': f'Student ID {student_id_str} not found'
+            }), 404
+        
+        # Process best frame (last one usually has best quality)
+        best_frame_data = frames_data[-1]
+        
+        try:
+            frame_bytes = base64.b64decode(best_frame_data)
+            nparr = np.frombuffer(frame_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if frame is None:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid image data'
+                }), 400
+            
+            success, message, face_encoding = face_service.enroll_student(frame, student)
+            
+            if not success:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+            
+            face_hash = face_service.compute_face_hash(face_encoding)
+            
+            student.face_encoding = face_encoding
+            student.face_hash = face_hash
+            
+            enroll_dir = os.path.join('static', 'enrollments')
+            ensure_dir(enroll_dir)
+            
+            image_filename = f"student_{student_id_str}.jpg"
+            image_path = os.path.join(enroll_dir, image_filename)
+            
+            cv2.imwrite(image_path, frame)
+            student.image_path = image_path
+            
+            db.session.commit()
+            face_service.load_encodings_from_db()
+            
+            logger.info(f"✓ Multi-shot enrollment successful for {student.name}")
+            
+            return jsonify({
+                'success': True,
+                'message': f'Student {student.name} enrolled successfully with {len(frames_data)} frames'
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Multi-shot enrollment error: {e}")
+            return jsonify({
+                'success': False,
+                'message': f'Enrollment failed: {str(e)}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Unexpected error: {str(e)}'
+        }), 500
+
 @api.route('/api/recognize', methods=['POST'])
 @token_required
 def recognize(current_user):
@@ -446,7 +643,6 @@ def recognize(current_user):
                 'message': 'No frame data provided'
             }), 400
         
-        # Decode frame
         frame_bytes = base64.b64decode(frame_data)
         nparr = np.frombuffer(frame_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -457,7 +653,6 @@ def recognize(current_user):
                 'message': 'Invalid frame data'
             }), 400
         
-        # Recognize faces
         recognition_result = face_service.recognize_faces(frame)
         
         return jsonify({
