@@ -273,12 +273,11 @@ h1, h2, h3 {
   }
 }
 
-/* === FIXED: Feed Controls (Bottom Center) === */
+/* === FIXED: Feed Controls (Bottom RIGHT - Like attendance_sys_ai) === */
 .feed-controls {
   position: absolute;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 20px; /* CHANGED FROM: left: 50%; transform: translateX(-50%); */
   display: flex;
   gap: 12px;
   z-index: 10;
@@ -286,7 +285,7 @@ h1, h2, h3 {
 }
 
 .feed-controls .btn {
-  min-width: 120px;
+  min-width: 100px;
   justify-content: center;
 }
 
@@ -777,10 +776,9 @@ h1, h2, h3 {
   }
   .feed-controls {
       flex-direction: column;
-      width: 90%;
-      left: 5%;
-      transform: translateX(0);
-      bottom: 10px;
+      width: calc(100% - 40px);
+      right: 20px;
+      bottom: 20px;
   }
   .feed-controls .btn {
       width: 100%;
