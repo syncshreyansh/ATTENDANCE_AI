@@ -1,0 +1,304 @@
+
+/* FIXED: Font Awesome Loading */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css');
+
+/* FIXED: Status Indicator - Remove unusual icons */
+.status-light {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background-color: rgba(0, 0, 0, 0.8); /* More opaque */
+    backdrop-filter: blur(10px);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-light::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+.status-light.status-offline::before {
+    background-color: var(--color-status-red);
+    box-shadow: 0 0 10px var(--color-status-red);
+}
+
+.status-light.status-online::before {
+    background-color: var(--color-status-green);
+    box-shadow: 0 0 15px var(--color-status-green);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+/* FIXED: Recognition Overlay - Clean and Clear */
+.recognition-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    padding: 12px 20px;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(0, 224, 240, 0.3);
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease-out;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.recognition-overlay::before {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 18px;
+    display: inline-block;
+}
+
+.recognition-overlay.show {
+    opacity: 1;
+    visibility: visible;
+    bottom: 24px;
+}
+
+/* Success State */
+.recognition-overlay.success {
+    background: rgba(22, 163, 74, 0.95);
+    border-color: rgba(34, 197, 94, 0.8);
+    box-shadow: 0 4px 20px rgba(22, 163, 74, 0.5);
+}
+
+.recognition-overlay.success::before {
+    content: '\f058'; /* fa-check-circle */
+    color: white;
+}
+
+/* Error State */
+.recognition-overlay.error {
+    background: rgba(239, 68, 68, 0.95);
+    border-color: rgba(255, 69, 69, 0.8);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+}
+
+.recognition-overlay.error::before {
+    content: '\f06a'; /* fa-exclamation-circle */
+    color: white;
+}
+
+/* Recognizing State */
+.recognition-overlay.recognizing {
+    background: rgba(88, 80, 236, 0.95);
+    border-color: rgba(139, 92, 246, 0.8);
+    box-shadow: 0 4px 20px rgba(88, 80, 236, 0.5);
+    animation: recognizePulse 2s ease-in-out infinite;
+}
+
+.recognition-overlay.recognizing::before {
+    content: '\f2bd'; /* fa-user-clock */
+    color: white;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes recognizePulse {
+    0%, 100% {
+        box-shadow: 0 4px 20px rgba(88, 80, 236, 0.5);
+    }
+    50% {
+        box-shadow: 0 6px 25px rgba(88, 80, 236, 0.7);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* FIXED: Ensure all icons load properly */
+i.fa, i.fas, i.far, i.fab {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Loading spinner for buttons */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 8px;
+}
+
+/* Enhanced button states */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+/* Modal improvements */
+.modal-backdrop.show {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-content {
+    animation: slideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Toast notification styles */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 300px;
+    max-width: 500px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+.toast-notification.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.toast-notification.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.toast-notification.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.toast-notification.info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* Responsive fixes */
+@media (max-width: 768px) {
+    .recognition-overlay {
+        font-size: 0.85rem;
+        padding: 10px 16px;
+        bottom: 16px;
+        left: 16px;
+        right: 16px;
+        max-width: calc(100% - 32px);
+    }
+    
+    .status-light {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+    
+    .toast-notification {
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+    }
+}
+
+

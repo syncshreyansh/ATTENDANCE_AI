@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_fixes.css') }}">
+    
     <style>
         /* --- CSS Variables --- */
         :root {
@@ -278,108 +280,6 @@
             margin-bottom: 16px;
         }
 
-        .status-light {
-            font-family: var(--font-mono);
-            font-size: 14px;
-            color: var(--color-text-secondary);
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 5;
-        }
-        .status-light.status-offline {
-            color: var(--color-status-red);
-        }
-        .status-light.status-online {
-            color: var(--color-status-green);
-        }
-
-        .feed-controls {
-            display: flex;
-            gap: 16px;
-            position: absolute;
-            bottom: 16px;
-            right: 16px;
-            z-index: 5;
-        }
-
-        /* --- MODIFIED RECOGNITION OVERLAY --- */
-        .recognition-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 20px; /* <-- Positioned to the left */
-            /* transform: translateX(-50%); */ /* <-- Removed center transform */
-            padding: 10px 20px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px; /* <-- Matched target image style */
-            color: white;
-            font-weight: 600;
-            font-size: 0.9rem;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease-out;
-            z-index: 5;
-            display: flex; /* <-- Added for icon alignment */
-            align-items: center; /* <-- Added for icon alignment */
-        }
-        
-        /* This new rule adds the icon */
-        .recognition-overlay::before {
-            content: '🔔';
-            font-size: 16px;
-            margin-right: 10px;
-            display: inline-block;
-        }
-
-        .recognition-overlay.show {
-            opacity: 1;
-            visibility: visible;
-            bottom: 30px;
-        }
-
-        .recognition-overlay.success {
-            background: rgba(16, 185, 129, 0.7);
-            border-color: rgba(16, 185, 129, 1);
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
-        }
-        
-        .recognition-overlay.success::before {
-            content: '✓'; /* Success icon */
-        }
-
-        .recognition-overlay.error {
-            background: rgba(239, 68, 68, 0.7);
-            border-color: rgba(239, 68, 68, 1);
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
-        }
-        
-        .recognition-overlay.error::before {
-            content: '✗'; /* Error icon */
-        }
-
-        .recognition-overlay.recognizing {
-            /* Purple background is removed to keep the dark theme */
-            /* background: rgba(139, 92, 246, 0.7); */
-            
-            /* Keep a subtle glow using the theme's accent color */
-            border-color: var(--color-accent); 
-            box-shadow: 0 0 20px var(--color-accent-glow);
-        }
-        
-        /* This new rule changes the icon during recognition */
-        .recognition-overlay.recognizing::before {
-            content: '👤'; /* Person icon */
-        }
-        /* --- END OF MODIFICATIONS --- */
-
-
         /* --- Stats Grid --- */
         .stats-grid {
             display: grid;
@@ -621,21 +521,6 @@
             display: none !important;
         }
 
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(0, 0, 0, 0.3);
-            border-top-color: #000;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-            margin-right: 8px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         /* --- Responsive --- */
         @media (max-width: 1200px) {
             .main-content {
@@ -696,6 +581,111 @@
                 justify-content: center;
             }
         }
+
+        /* --- STYLES from previous (multi-shot) merge --- */
+       .quality-feedback-overlay {
+           position: absolute;
+           top: 10px;
+           left: 10px;
+           right: 10px;
+           background: rgba(0, 0, 0, 0.8);
+           backdrop-filter: blur(10px);
+           padding: 12px;
+           border-radius: 8px;
+           color: white;
+           font-size: 14px;
+           z-index: 10;
+           transition: all 0.3s ease;
+       }
+       
+       .quality-feedback-overlay.excellent {
+           background: rgba(22, 163, 74, 0.9);
+           border: 2px solid #16a34a;
+       }
+       
+       .quality-feedback-overlay.good {
+           background: rgba(234, 179, 8, 0.9);
+           border: 2px solid #eab308;
+       }
+       
+       .quality-feedback-overlay.poor {
+           background: rgba(239, 68, 68, 0.9);
+           border: 2px solid #ef4444;
+       }
+       
+       .quality-item {
+           display: flex;
+           align-items: center;
+           margin: 4px 0;
+           font-size: 13px;
+       }
+       
+       .quality-item i {
+           margin-right: 8px;
+           font-size: 14px;
+       }
+       
+       .quality-score-bar {
+           width: 100%;
+           height: 4px;
+           background: rgba(255, 255, 255, 0.2);
+           border-radius: 2px;
+           margin-top: 8px;
+           overflow: hidden;
+       }
+       
+       .quality-score-fill {
+           height: 100%;
+           background: linear-gradient(90deg, #ef4444, #eab308, #16a34a);
+           transition: width 0.5s ease;
+       }
+       
+       .capture-progress {
+           position: absolute;
+           bottom: 16px;
+           left: 50%;
+           transform: translateX(-50%);
+           background: rgba(0, 0, 0, 0.8);
+           padding: 8px 16px;
+           border-radius: 20px;
+           color: white;
+           font-size: 14px;
+           display: none;
+           z-index: 10;
+       }
+       
+       .frame-capture-indicator {
+           position: absolute;
+           top: 50%;
+           left: 50%;
+           transform: translate(-50%, -50%);
+           width: 80px;
+           height: 80px;
+           border: 4px solid rgba(0, 224, 240, 0.5);
+           border-radius: 50%;
+           animation: pulse 1s infinite;
+           display: none;
+           z-index: 10;
+       }
+       
+       @keyframes pulse {
+           0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+           50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
+       }
+       
+       .countdown-overlay {
+           position: absolute;
+           top: 50%;
+           left: 50%;
+           transform: translate(-50%, -50%);
+           font-size: 72px;
+           color: #00E0F0;
+           font-weight: 700;
+           text-shadow: 0 0 20px rgba(0, 224, 240, 0.8);
+           display: none;
+           z-index: 15;
+       }
+       /* --- END OF PREVIOUS MERGE STYLES --- */
     </style>
 </head>
 <body>
@@ -715,7 +705,8 @@
         <section class="main-content">
             <div class="left-column">
                 <div class="camera-feed-placeholder">
-                    <span class="status-light status-offline" id="status-indicator">● Offline</span>
+                    <span class="status-light status-offline" id="status-indicator">Offline</span>
+                    
                     <video id="liveFeedVideo" autoplay playsinline muted></video>
                     <div class="feed-placeholder" id="feedPlaceholder">
                         <i class="fa-solid fa-camera-slash"></i>
@@ -775,9 +766,27 @@
             </div>
             <div class="modal-body">
                 <div class="modal-camera-area">
-                    <div class="camera-feed-placeholder large">
+                    
+                    <div class="camera-feed-placeholder large" id="enrollmentPreview">
+                        <div class="quality-feedback-overlay" id="qualityFeedback" style="display: none;">
+                            <div id="qualityMessage">Analyzing...</div>
+                            <div class="quality-score-bar">
+                                <div class="quality-score-fill" id="qualityScoreFill" style="width: 0%"></div>
+                            </div>
+                            <div id="qualityItems" style="margin-top: 8px;"></div>
+                        </div>
+                        
+                        <div class="countdown-overlay" id="countdownOverlay">3</div>
+                        
+                        <div class="frame-capture-indicator" id="frameIndicator"></div>
+                        
+                        <div class="capture-progress" id="captureProgress">
+                            Captured: <span id="frameCount">0</span> / 7 frames
+                        </div>
+                        
                         <video id="videoPreview" autoplay playsinline muted></video>
                         <canvas id="photoCanvas"></canvas>
+                        
                         <div class="feed-placeholder">
                             <i class="fa-solid fa-camera"></i>
                             <p>Camera Preview</p>
@@ -825,5 +834,18 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<!-- Update the status indicator HTML in dashboard.html -->
+<script>
+    // Fixed: Update status text without unusual characters
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusIndicator = document.getElementById('status-indicator');
+        if (statusIndicator) {
+            // Remove any unusual characters
+            statusIndicator.textContent = statusIndicator.classList.contains('status-online') 
+                ? 'Online' 
+                : 'Offline';
+        }
+    });
+    </script>
 </body>
 </html>
