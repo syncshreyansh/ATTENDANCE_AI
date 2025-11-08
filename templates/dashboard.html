@@ -214,22 +214,22 @@
 
         /* --- Camera Feed --- */
         .camera-feed-placeholder {
-            width: 100%;
-            background: rgba(24, 24, 24, 0.5);
-            backdrop-filter: blur(25px);
-            border: none;
-            border-radius: 12px;
-            box-shadow: none;
-            transition: all 0.3s ease;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: var(--color-text-secondary);
-            font-family: var(--font-mono);
-            position: relative;
-            flex: 1;
-        }
+    width: 100%;
+    background: rgba(24, 24, 24, 0.5);
+    backdrop-filter: blur(25px);
+    border: none;
+    border-radius: 12px;
+    box-shadow: none;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    position: relative;
+    flex: 1;
+}
         .camera-feed-placeholder:hover {
             box-shadow: 0 0 30px var(--color-accent-strong-glow);
         }
@@ -570,13 +570,14 @@
                 justify-content: center;
             }
             .feed-controls {
-                flex-direction: column;
-                width: 90%;
-                right: 5%;
-                left: 5%;
-                bottom: 10px;
-                align-items: stretch;
-            }
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+    align-items: center;
+}
             .feed-controls .btn {
                 justify-content: center;
             }

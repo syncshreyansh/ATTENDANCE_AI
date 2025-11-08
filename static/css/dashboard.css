@@ -277,11 +277,14 @@ h1, h2, h3 {
 .feed-controls {
   position: absolute;
   bottom: 20px;
-  right: 20px; /* CHANGED FROM: left: 50%; transform: translateX(-50%); */
+  right: 20px;
   display: flex;
   gap: 12px;
   z-index: 10;
   align-items: center;
+  /* Remove any centering transforms */
+  left: auto !important;
+  transform: none !important;
 }
 
 .feed-controls .btn {
@@ -775,13 +778,15 @@ h1, h2, h3 {
       order: 2;
   }
   .feed-controls {
-      flex-direction: column;
-      width: calc(100% - 40px);
-      right: 20px;
-      bottom: 20px;
+    flex-direction: column;
+    width: auto; /* Changed from calc(100% - 40px) */
+    right: 20px;
+    bottom: 20px;
+    gap: 8px;
   }
+  
   .feed-controls .btn {
-      width: 100%;
+    width: 120px; /* Fixed width instead of 100% */
   }
   .recognition-overlay {
       font-size: 0.85rem;
@@ -801,4 +806,18 @@ h1, h2, h3 {
       flex-wrap: wrap;
       justify-content: center;
   }
+  .feed-controls {
+    flex-direction: column;
+    width: auto;
+    right: 16px;
+    bottom: 16px;
+    gap: 8px;
+  }
+  
+  .feed-controls .btn {
+    width: 110px;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
 }
