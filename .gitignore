@@ -12,3 +12,6 @@ git rm -r --cached **/__pycache__/
 
 # Untrack any .dat files (if they are large models)
 git rm -r --cached **/*.dat
+git rm -r --cached .venv/
+git rm -r --cached .vscode/
+git rm -r --cached instance/
