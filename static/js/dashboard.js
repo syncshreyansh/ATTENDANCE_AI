@@ -1,4 +1,4 @@
-// Enhanced dashboard with intelligent notification system and spoof detection
+// Enhanced dashboard with intelligent notification system and FIXED quality feedback
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -58,9 +58,11 @@ class AttendanceDashboard {
     // Notification state management
     this.currentNotificationState = null;
     this.lastNotificationTime = 0;
-    this.notificationDebounce = 1000; // 1 second debounce
+    this.notificationDebounce = 1000;
 
-    // === ORIGINAL DOM ELEMENTS ===
+    // FIXED: Quality feedback auto-dismiss timer
+    this.qualityFeedbackTimer = null;
+
     this.captureBtn = document.getElementById("capturePhoto");
     this.recaptureBtn = document.getElementById("recapturePhoto");
     this.videoPreview = document.getElementById("videoPreview");
@@ -88,10 +90,9 @@ class AttendanceDashboard {
     this.recentEventsList = document.getElementById("recentEvents");
 
     this.processingCanvas = document.createElement('canvas');
-    this.processingCanvas.width = 320;  // Reduced for better performance
+    this.processingCanvas.width = 320;
     this.processingCanvas.height = 240;
 
-    // === NEW DOM ELEMENTS (from Claude) ===
     this.qualityFeedback = document.getElementById('qualityFeedback');
     this.qualityMessage = document.getElementById('qualityMessage');
     this.qualityScoreFill = document.getElementById('qualityScoreFill');
@@ -101,7 +102,6 @@ class AttendanceDashboard {
     this.captureProgress = document.getElementById('captureProgress');
     this.frameCount = document.getElementById('frameCount');
     
-    // === NEW STATE VARIABLES (from Claude) ===
     this.isCapturing = false;
     this.capturedFrames = [];
     this.targetFrameCount = 7;
@@ -126,30 +126,22 @@ class AttendanceDashboard {
     document.getElementById("close-modal-btn").addEventListener("click", () => this.closeModal());
     document.getElementById("cancel-modal-btn").addEventListener("click", () => this.closeModal());
 
-    // === MODIFIED/NEW EVENT LISTENERS ===
-    // REPLACED: captureBtn listener now calls multi-shot
     this.captureBtn.addEventListener("click", () => this.startMultiShotCapture());
-    // REPLACED: recaptureBtn now resets the multi-shot UI and restarts camera
     this.recaptureBtn.addEventListener("click", () => {
-        this.resetCaptureUI(); // Resets buttons
-        this.startVideoStream(); // Restarts camera
-        this.startQualityMonitoring(); // Restarts quality check
+        this.resetCaptureUI();
+        this.startVideoStream();
+        this.startQualityMonitoring();
     });
-    // REMOVED: this.enrollForm.addEventListener("submit", ...)
-    // The new logic submits programmatically via this.submitEnrollment()
-    // We add a listener to the submit button just in case, but it's disabled
-    // until capture is complete.
+    
     this.enrollSubmitBtn.addEventListener("click", (e) => {
-        e.preventDefault(); // Prevent default form submission
+        e.preventDefault();
         if (this.capturedFrames.length >= this.targetFrameCount) {
             this.submitEnrollment();
         } else {
             this.showNotification("Please capture photos first.", "warning");
         }
     });
-    // === END OF MODIFICATIONS ===
 
-    // Enhanced validation for form inputs
     document.getElementById("student-name").addEventListener("input", (e) => {
       e.target.value = e.target.value.replace(/[^A-Za-z\s]/g, '');
     });
@@ -158,7 +150,6 @@ class AttendanceDashboard {
       e.target.value = e.target.value.replace(/\D/g, '');
     });
 
-    // SocketIO Listeners with intelligent state handling
     this.socket.on("recognition_status", (data) => {
       this.handleRecognitionStatus(data);
     });
@@ -172,7 +163,6 @@ class AttendanceDashboard {
       this.handleRecentEvent(data);
     });
     
-    // NEW: Listen for spoof/activity updates
     this.socket.on('activity_update', (data) => {
       this.handleActivityUpdate(data);
     });
@@ -182,7 +172,6 @@ class AttendanceDashboard {
   }
 
   handleActivityUpdate(data) {
-    // (This function is from your original file, no changes needed)
     console.log('📊 Activity update:', data);
     
     const statusColors = {
@@ -213,7 +202,6 @@ class AttendanceDashboard {
   }
 
   handleRecognitionStatus(data) {
-    // (This function is from your original file, no changes needed)
     const now = Date.now();
     
     if (now - this.lastNotificationTime < this.notificationDebounce && 
@@ -250,7 +238,6 @@ class AttendanceDashboard {
   }
 
   handleRecentEvent(data) {
-    // (This function is from your original file, no changes needed)
     const eventMessages = {
       'camera_obstructed': '🚫 Camera feed obstructed',
       'camera_resumed': '✅ Camera feed restored'
@@ -266,10 +253,7 @@ class AttendanceDashboard {
     console.log(`📋 Event logged: ${message}`);
   }
 
-  // === Video Stream Methods ===
-
   async startVideoStream() {
-    // (Original function from dashboard.js)
     if (this.videoStream) return;
     try {
       this.videoStream = await navigator.mediaDevices.getUserMedia({
@@ -288,7 +272,6 @@ class AttendanceDashboard {
   }
 
   stopVideoStream() {
-    // (Original function from dashboard.js)
     if (this.videoStream) {
       this.videoStream.getTracks().forEach((track) => {
         track.stop();
@@ -302,7 +285,6 @@ class AttendanceDashboard {
   }
 
   async startLiveFeed() {
-    // (Original function from dashboard.js)
     if (this.liveStream) {
       console.log('Live feed already running');
       return;
@@ -333,7 +315,6 @@ class AttendanceDashboard {
   }
 
   stopLiveFeed() {
-    // (Original function from dashboard.js)
     console.log('=== STOPPING LIVE FEED ===');
     
     this.cameraStopRequested = true;
@@ -368,7 +349,6 @@ class AttendanceDashboard {
   }
 
   startFrameProcessing() {
-    // (Original function from dashboard.js)
     if (this.processingInterval) {
       console.log('Frame processing already running');
       return;
@@ -383,7 +363,6 @@ class AttendanceDashboard {
   }
 
   stopFrameProcessing() {
-    // (Original function from dashboard.js)
     if (this.processingInterval) {
       console.log('Stopping frame processing...');
       clearInterval(this.processingInterval);
@@ -393,7 +372,6 @@ class AttendanceDashboard {
   }
 
   captureAndSendFrame() {
-    // (Original function from dashboard.js)
     if (!this.liveFeedVideo || !this.liveStream || !this.isSystemRunning || this.cameraStopRequested) {
       return;
     }
@@ -413,8 +391,6 @@ class AttendanceDashboard {
     }
   }
 
-  // === Enrollment Modal Methods (MERGED) ===
-
   async openModal() {
     if (this.isSystemRunning) {
       this.showNotification(
@@ -424,20 +400,18 @@ class AttendanceDashboard {
       return;
     }
     this.enrollModal.classList.add('show');
-    this.resetCaptureUI(); // Resets buttons and canvas
-    await this.startVideoStream(); // Starts the camera
+    this.resetCaptureUI();
+    await this.startVideoStream();
     
-    // NEW: Start quality monitoring
-    // Small delay to ensure camera is ready
     setTimeout(() => {
         this.startQualityMonitoring();
     }, 500);
   }
 
   closeModal() {
-    this.stopVideoStream(); // Stops the camera
-    this.stopQualityMonitoring(); // NEW: Stops quality checks
-    this.resetCapture(); // NEW: Resets capture state
+    this.stopVideoStream();
+    this.stopQualityMonitoring();
+    this.resetCapture();
     
     this.enrollModal.classList.remove('show');
     this.enrollForm.reset();
@@ -447,7 +421,6 @@ class AttendanceDashboard {
   }
 
   resetCaptureUI() {
-    // This function is now used to reset the UI for a new session
     this.videoPreview.style.display = "block";
     this.photoCanvas.style.display = "none";
 
@@ -458,12 +431,8 @@ class AttendanceDashboard {
     this.captureBtn.disabled = false;
     this.enrollSubmitBtn.innerHTML = '<i class="fas fa-check"></i> Submit';
 
-    // NEW: Reset multi-shot state
     this.resetCapture();
   }
-
-  // === Data Loading & API Methods ===
-  // (These functions are from your original file, no changes needed)
 
   async loadInitialData() {
     this.loadStats();
@@ -505,9 +474,6 @@ class AttendanceDashboard {
     }
   }
 
-  // === System & Socket Methods ===
-  // (These functions are from your original file, no changes needed)
-
   startSystem() {
     console.log('Starting system...');
     this.socket.emit("start_system");
@@ -532,14 +498,14 @@ class AttendanceDashboard {
       this.stopBtn.disabled = false;
       this.statusIndicator.classList.remove("status-offline");
       this.statusIndicator.classList.add("status-online");
-      this.statusIndicator.textContent = "● Online";
+      this.statusIndicator.textContent = "Online";
       this.startLiveFeed();
     } else {
       this.startBtn.disabled = false;
       this.stopBtn.disabled = true;
       this.statusIndicator.classList.remove("status-online");
       this.statusIndicator.classList.add("status-offline");
-      this.statusIndicator.textContent = "● Offline";
+      this.statusIndicator.textContent = "Offline";
       this.stopLiveFeed();
       this.showOverlay(null);
     }
@@ -560,7 +526,6 @@ class AttendanceDashboard {
   }
 
   updateStatsInstantly() {
-    // (This function is from your original file, no changes needed)
     const currentPresent = parseInt(this.presentCountEl.textContent) || 0;
     const newPresent = currentPresent + 1;
     this.animateStatChange(this.presentCountEl, currentPresent, newPresent);
@@ -582,7 +547,6 @@ class AttendanceDashboard {
   }
 
   animateStatChange(element, oldValue, newValue, suffix = '') {
-    // (This function is from your original file, no changes needed)
     element.style.transform = 'scale(1.2)';
     element.style.color = 'var(--color-accent)';
     element.style.transition = 'all 0.3s ease';
@@ -610,9 +574,6 @@ class AttendanceDashboard {
     }, stepDuration);
   }
 
-
-  // === Helper & UI Methods ===
-  // (These functions are from your original file, no changes needed)
   showOverlay(message, type, duration = 2000) {
     clearTimeout(this.overlayTimeout);
 
@@ -660,7 +621,6 @@ class AttendanceDashboard {
   }
 
   showNotification(message, type = "success") {
-    // (This function is from your original file, no changes needed)
     const notification = document.createElement("div");
     notification.className = `notification ${type}`;
     notification.textContent = message;
@@ -704,11 +664,11 @@ class AttendanceDashboard {
     }, 3000);
   }
 
-  // === ALL NEW METHODS FROM CLAUDE'S SCRIPT (MERGED) ===
-  // (These are now part of the AttendanceDashboard class)
-
+  // === FIXED: Quality monitoring with auto-dismiss ===
   startQualityMonitoring() {
+    this.qualityFeedback.classList.remove('show');
     this.qualityFeedback.style.display = 'block';
+    
     this.qualityCheckInterval = setInterval(() => {
       this.checkFrameQuality();
     }, 500);
@@ -719,15 +679,19 @@ class AttendanceDashboard {
       clearInterval(this.qualityCheckInterval);
       this.qualityCheckInterval = null;
     }
+    if (this.qualityFeedbackTimer) {
+      clearTimeout(this.qualityFeedbackTimer);
+      this.qualityFeedbackTimer = null;
+    }
     if (this.qualityFeedback) {
-        this.qualityFeedback.style.display = 'none';
+      this.qualityFeedback.classList.remove('show');
+      this.qualityFeedback.style.display = 'none';
     }
   }
 
   async checkFrameQuality() {
-    // Use this.videoPreview (from original class)
     if (!this.videoPreview || !this.videoPreview.srcObject) {
-        return;
+      return;
     }
     
     try {
@@ -743,7 +707,7 @@ class AttendanceDashboard {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // 'token' is globally available
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ frame: frameData })
       });
@@ -759,32 +723,30 @@ class AttendanceDashboard {
   }
 
   updateQualityUI(result) {
+    // Clear previous auto-dismiss timer
+    if (this.qualityFeedbackTimer) {
+      clearTimeout(this.qualityFeedbackTimer);
+      this.qualityFeedbackTimer = null;
+    }
+
     if (!result.has_face) {
-      this.qualityFeedback.className = 'quality-feedback-overlay poor';
+      this.qualityFeedback.className = 'quality-feedback-overlay poor show';
       this.qualityMessage.textContent = result.feedback.message;
       this.qualityScoreFill.style.width = '0%';
-      this.qualityItems.innerHTML = '';
       return;
     }
     
     const feedback = result.feedback;
-    this.qualityFeedback.className = `quality-feedback-overlay ${feedback.status}`;
+    this.qualityFeedback.className = `quality-feedback-overlay ${feedback.status} show`;
     this.qualityMessage.textContent = feedback.message;
     const qualityScore = result.quality_score || 0;
     this.qualityScoreFill.style.width = `${qualityScore * 100}%`;
     
-    if (feedback.items && feedback.items.length > 0) {
-      this.qualityItems.innerHTML = feedback.items
-        .map(item => {
-          const icon = item.score >= 0.7 ? '✓' : '⚠️';
-          return `<div class="quality-item">
-                      <i>${icon}</i>
-                      <span>${item.feedback}</span>
-                  </div>`;
-        })
-        .join('');
-    } else {
-      this.qualityItems.innerHTML = '';
+    // FIXED: Auto-dismiss notification after 1-2 seconds if perfect
+    if (feedback.status === 'excellent') {
+      this.qualityFeedbackTimer = setTimeout(() => {
+        this.qualityFeedback.classList.remove('show');
+      }, 1500); // Dismiss after 1.5 seconds
     }
   }
 
@@ -793,17 +755,18 @@ class AttendanceDashboard {
       return;
     }
     
-    // Check if form is valid before starting capture
     const studentId = document.getElementById("student-id").value.trim();
     if (!studentId) {
-        this.showNotification("Please fill out the Student ID first.", "warning");
-        return;
+      this.showNotification("Please fill out the Student ID first.", "warning");
+      return;
     }
 
     this.isCapturing = true;
     this.capturedFrames = [];
     
-    // Hide capture button, show progress
+    // Stop quality monitoring during capture
+    this.stopQualityMonitoring();
+    
     this.captureBtn.classList.add('hidden');
     this.recaptureBtn.classList.add('hidden');
     this.captureProgress.style.display = 'block';
@@ -836,7 +799,6 @@ class AttendanceDashboard {
     }
     
     try {
-      // Use this.videoPreview (from original class)
       const canvas = document.createElement('canvas');
       canvas.width = this.videoPreview.videoWidth;
       canvas.height = this.videoPreview.videoHeight;
@@ -873,52 +835,35 @@ class AttendanceDashboard {
     this.frameIndicator.style.display = 'none';
     this.captureProgress.style.display = 'none';
     
-    // Stop the camera and quality checks
     this.stopVideoStream();
     this.stopQualityMonitoring();
 
-    // Show the "recapture" and "submit" buttons
     this.recaptureBtn.classList.remove('hidden');
     this.enrollSubmitBtn.disabled = false;
     
-    // Show the last captured frame on the canvas
     const lastFrameData = this.capturedFrames[this.capturedFrames.length - 1];
     const img = new Image();
     img.onload = () => {
-        const ctx = this.photoCanvas.getContext('2d');
-        this.photoCanvas.width = img.width;
-        this.photoCanvas.height = img.height;
-        ctx.clearRect(0, 0, img.width, img.height);
-        
-        // We need to re-flip the canvas image to display it correctly
-        // (since it was captured from a mirrored video)
-        // But the original `capturePhoto` did NOT re-flip, it drew the mirrored
-        // image. To be consistent, we will also draw the mirrored image.
-        // If you want it un-mirrored, uncomment the next two lines:
-        // ctx.translate(img.width, 0);
-        // ctx.scale(-1, 1);
-        
-        ctx.drawImage(img, 0, 0);
+      const ctx = this.photoCanvas.getContext('2d');
+      this.photoCanvas.width = img.width;
+      this.photoCanvas.height = img.height;
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
     }
-    // We need to re-create the base64 string for the Image element
-    img.src = "data:image/jpeg;base64," + this.capturedFrames[this.capturedFrames.length - 1];
-
+    img.src = "data:image/jpeg;base64," + lastFrameData;
 
     this.videoPreview.style.display = "none";
     this.photoCanvas.style.display = "block";
 
-    // Automatically trigger enrollment submission
     this.submitEnrollment();
   }
 
   async submitEnrollment() {
-    // This function replaces the old handleEnrollSubmit
     const enrollBtn = this.enrollSubmitBtn;
     enrollBtn.disabled = true;
     enrollBtn.innerHTML = '<span class="spinner"></span> Processing...';
     
     try {
-      // Validate form
       const name = document.getElementById("student-name").value.trim();
       const studentId = document.getElementById("student-id").value.trim();
       const studentClass = document.getElementById("class").value.trim();
@@ -943,7 +888,6 @@ class AttendanceDashboard {
         parent_phone: parentPhone,
       };
 
-      // 1. Create Student
       console.log('Creating student...');
       const createResponse = await fetch("/api/students", {
         method: "POST",
@@ -955,17 +899,13 @@ class AttendanceDashboard {
       });
       const createResult = await createResponse.json();
       if (!createResponse.ok) {
-        // If student already exists, this might fail.
-        // We should check for "Student ID already exists"
         if (createResult.message.includes("already exists")) {
-            console.warn("Student already exists, proceeding to enroll face.");
+          console.warn("Student already exists, proceeding to enroll face.");
         } else {
-            throw new Error(createResult.message);
+          throw new Error(createResult.message);
         }
       }
       
-      // 2. Register Student Login (if not already registered)
-      // This logic is from the original file, it's important
       console.log('Creating login...');
       const registerResponse = await fetch("/api/auth/register", {
         method: "POST",
@@ -978,18 +918,16 @@ class AttendanceDashboard {
           email: studentData.student_id + '@school.com',
           password: 'student123',
           role: 'student',
-          student_id: createResult.id || studentData.student_id // Use ID from creation or fallback
+          student_id: createResult.id || studentData.student_id
         }),
       });
       if (!registerResponse.ok) {
-          const registerResult = await registerResponse.json();
-          // It's ok if user already exists
-          if (!registerResult.message.includes("already exists")) {
-              console.warn("Could not register login: " + registerResult.message);
-          }
+        const registerResult = await registerResponse.json();
+        if (!registerResult.message.includes("already exists")) {
+          console.warn("Could not register login: " + registerResult.message);
+        }
       }
 
-      // 3. Enroll Face (Multi-shot)
       console.log('Enrolling face (multi-shot)...');
       const enrollResponse = await fetch('/api/enroll-multishot', {
         method: 'POST',
@@ -999,7 +937,7 @@ class AttendanceDashboard {
         },
         body: JSON.stringify({
           student_id: studentId,
-          frames: this.capturedFrames // Send all captured frames
+          frames: this.capturedFrames
         })
       });
       
@@ -1007,18 +945,16 @@ class AttendanceDashboard {
       
       if (result.success) {
         this.showNotification(`✅ ${result.message || 'Student enrolled successfully!'}`, "success");
-        this.loadInitialData(); // Reload stats
-        this.closeModal(); // Close modal on success
+        this.loadInitialData();
+        this.closeModal();
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
       console.error('Enrollment error:', error);
       this.showNotification(`❌ ${error.message}`, "error");
-      // Don't reset capture, allow user to retry submission
       enrollBtn.disabled = false;
       enrollBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit';
-      // Show recapture button so user can try again
       this.recaptureBtn.classList.remove('hidden');
       this.captureBtn.classList.add('hidden');
     }
@@ -1031,12 +967,11 @@ class AttendanceDashboard {
     if (this.captureProgress) this.captureProgress.style.display = 'none';
     if (this.frameCount) this.updateFrameCount();
     
-    // Reset buttons
     if (this.captureBtn) this.captureBtn.classList.remove('hidden');
     if (this.recaptureBtn) this.recaptureBtn.classList.add('hidden');
     if (this.enrollSubmitBtn) {
-        this.enrollSubmitBtn.disabled = true;
-        this.enrollSubmitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit';
+      this.enrollSubmitBtn.disabled = true;
+      this.enrollSubmitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit';
     }
   }
 

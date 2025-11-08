@@ -1,6 +1,7 @@
 """
 Ensemble Anti-Spoofing Module
 Combines texture analysis, CNN classification, object detection, FFT/moiré, and reflection checks
+FIXED: Handles missing CNN model gracefully without repeated warnings
 """
 import cv2
 import numpy as np
@@ -14,25 +15,40 @@ logger = logging.getLogger(__name__)
 _cnn_model = None
 _yolo_model = None
 _yolo_load_attempted = False
+_cnn_load_attempted = False  # FIXED: Add flag to prevent repeated warnings
+_cnn_available = False  # FIXED: Track if CNN is available
 
 def load_cnn_model():
     """Load ONNX anti-spoof CNN model (ResNet18 or MobileNetV2)"""
-    global _cnn_model
-    if _cnn_model is not None:
+    global _cnn_model, _cnn_load_attempted, _cnn_available
+    
+    # FIXED: Only attempt to load once
+    if _cnn_load_attempted:
         return _cnn_model
+    
+    _cnn_load_attempted = True
     
     model_path = 'models/anti_spoof_resnet18.onnx'
     if not os.path.exists(model_path):
-        logger.warning(f"CNN model not found at {model_path}, skipping CNN check")
+        # FIXED: Log info only once, not warning
+        logger.info(f"CNN model not found at {model_path}. Spoof detection will work with other methods (texture, FFT, reflection).")
+        logger.info("To enable CNN-based spoof detection, train and export a model using train_antispoofing.py")
+        _cnn_available = False
         return None
     
     try:
         import onnxruntime as ort
         _cnn_model = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        logger.info("CNN anti-spoof model loaded (ONNX)")
+        _cnn_available = True
+        logger.info("✓ CNN anti-spoof model loaded successfully (ONNX)")
         return _cnn_model
+    except ImportError:
+        logger.warning("onnxruntime not installed. Install with: pip install onnxruntime")
+        _cnn_available = False
+        return None
     except Exception as e:
         logger.error(f"Failed to load CNN model: {e}")
+        _cnn_available = False
         return None
 
 def load_yolo_model():
@@ -50,8 +66,8 @@ def load_yolo_model():
     
     model_path = 'models/yolov5n.pt'
     if not os.path.exists(model_path):
-        logger.warning(f"YOLO model not found at {model_path}, skipping object detection")
-        logger.info("Phone detection will be disabled. To enable, download: wget https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5n.pt -O models/yolov5n.pt")
+        logger.info(f"YOLO model not found at {model_path}. Phone detection will be disabled.")
+        logger.info("To enable phone detection, download: wget https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5n.pt -O models/yolov5n.pt")
         return None
     
     try:
@@ -59,14 +75,13 @@ def load_yolo_model():
         from ultralytics import YOLO
         _yolo_model = YOLO(model_path)
         _yolo_model.conf = 0.5
-        logger.info("YOLOv5 nano loaded for device detection")
+        logger.info("✓ YOLOv5 nano loaded for device detection")
         return _yolo_model
     except ImportError:
-        logger.warning("ultralytics library not installed. Install with: pip install ultralytics")
+        logger.info("ultralytics library not installed. Phone detection disabled. Install with: pip install ultralytics")
         return None
     except Exception as e:
-        logger.warning(f"Could not load YOLO model: {e}")
-        logger.info("Phone detection will be disabled. System will work with other spoof checks.")
+        logger.info(f"Could not load YOLO model: {e}. Phone detection will be disabled.")
         return None
 
 def calculate_laplacian_variance(face_roi):
@@ -125,7 +140,7 @@ def run_cnn_classifier(face_roi):
     """Run CNN to classify live vs photo vs screen"""
     model = load_cnn_model()
     if model is None:
-        return 0.0, "cnn_model_unavailable"
+        return 0.0, "cnn_unavailable"
     
     try:
         # Preprocess: resize to 224x224, normalize
@@ -193,6 +208,7 @@ def check(frame, face_bbox, face_encoding=None):
     """
     Main ensemble spoof detection
     Returns: dict {is_spoof: bool, spoof_type: str or list, confidence: float, evidence: dict}
+    FIXED: Works without CNN model, uses other detection methods
     """
     try:
         x, y, w, h = face_bbox
@@ -206,7 +222,7 @@ def check(frame, face_bbox, face_encoding=None):
                 'evidence': {'error': 'invalid_face_roi'}
             }
         
-        # Run all checks
+        # Run all available checks
         texture_var = calculate_laplacian_variance(face_roi)
         texture_conf = 1.0 if texture_var < 50 else 0.0  # Low variance = spoof
         
@@ -216,43 +232,56 @@ def check(frame, face_bbox, face_encoding=None):
         # Invert: low reflection = spoof
         reflection_spoof_conf = 1.0 - reflection_conf if reflection_conf < 0.3 else 0.0
         
-        cnn_conf, cnn_type = run_cnn_classifier(face_roi)
+        # FIXED: Only run CNN if available
+        cnn_conf = 0.0
+        cnn_type = "cnn_unavailable"
+        if _cnn_available:
+            cnn_conf, cnn_type = run_cnn_classifier(face_roi)
         
         phone_conf, phone_bbox = detect_phone_in_frame(frame, (x, y, x+w, y+h))
         
         # Blink check is handled externally by liveness_detection.py
         blink_conf = 0.0
         
-        # Weighted fusion score
-        # S = 0.25*cnn + 0.2*texture + 0.2*phone + 0.15*moire + 0.1*reflection + 0.1*(1-blink)
-        S = (0.25 * cnn_conf +
-             0.2 * texture_conf +
-             0.2 * phone_conf +
-             0.15 * moire_conf +
-             0.1 * reflection_spoof_conf +
-             0.1 * (1 - blink_conf))
+        # FIXED: Weighted fusion score - adjusted for missing CNN
+        # If CNN is not available, redistribute its weight to other methods
+        if _cnn_available:
+            # Original weights with CNN
+            S = (0.25 * cnn_conf +
+                 0.2 * texture_conf +
+                 0.2 * phone_conf +
+                 0.15 * moire_conf +
+                 0.1 * reflection_spoof_conf +
+                 0.1 * (1 - blink_conf))
+        else:
+            # Redistributed weights without CNN (total still = 1.0)
+            S = (0.35 * texture_conf +      # Increased from 0.2
+                 0.25 * phone_conf +         # Increased from 0.2
+                 0.20 * moire_conf +         # Increased from 0.15
+                 0.10 * reflection_spoof_conf +
+                 0.10 * (1 - blink_conf))
         
         # Calculate reliability based on image quality
         reliability = 1.0
         avg_brightness = np.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
         if avg_brightness < 30:
             reliability *= 0.5
-            logger.warning("Low-light detected, spoof detection reliability reduced")
+            logger.debug("Low-light detected, spoof detection reliability reduced")
         
         if face_roi.size < 10000:  # Very small face
             reliability *= 0.7
-            logger.warning("Small/distant face, reliability reduced")
+            logger.debug("Small/distant face, reliability reduced")
         
         # Determine spoof types
         spoof_types = []
-        if cnn_conf > 0.6:
+        if _cnn_available and cnn_conf > 0.6:
             spoof_types.append(cnn_type)
         if phone_conf > 0.5:
             spoof_types.append("phone_in_frame")
         if moire_conf > 0.7:
-            spoof_types.append("screen_refresh_banding_detected")
+            spoof_types.append("screen_refresh_banding")
         if texture_var < 30:
-            spoof_types.append("low_texture_printed_photo")
+            spoof_types.append("low_texture_photo")
         
         # Decision thresholds
         is_spoof = S >= 0.7
@@ -262,19 +291,20 @@ def check(frame, face_bbox, face_encoding=None):
             'texture_variance': round(texture_var, 2),
             'moire_confidence': round(moire_conf, 2),
             'reflection_confidence': round(reflection_conf, 2),
-            'cnn_confidence': round(cnn_conf, 2),
+            'cnn_confidence': round(cnn_conf, 2) if _cnn_available else 'unavailable',
             'cnn_type': cnn_type,
             'phone_detector_confidence': round(phone_conf, 2),
             'phone_bbox': phone_bbox,
             'fusion_score': round(S, 2),
-            'reliability_score': round(reliability, 2)
+            'reliability_score': round(reliability, 2),
+            'cnn_enabled': _cnn_available
         }
         
         # If unreliable, downweight confidence
         if reliability < 0.6 and is_spoof:
-            logger.info("Low reliability - downweighting confidence")
+            logger.debug("Low reliability - downweighting confidence")
             S = S * reliability
-            spoof_types = ['low_reliability_check'] + (spoof_types if spoof_types else [])
+            spoof_types = ['low_reliability'] + (spoof_types if spoof_types else [])
         
         return {
             'is_spoof': is_spoof,
@@ -290,3 +320,22 @@ def check(frame, face_bbox, face_encoding=None):
             'confidence': 0.0,
             'evidence': {'error': str(e)}
         }
+
+# FIXED: Add helper function to check system status
+def get_spoof_detection_status():
+    """
+    Get current status of spoof detection components
+    Returns dict with availability of each component
+    """
+    # Trigger lazy loading
+    load_cnn_model()
+    load_yolo_model()
+    
+    return {
+        'cnn_available': _cnn_available,
+        'yolo_available': _yolo_model is not None,
+        'texture_analysis': True,  # Always available
+        'fft_moire': True,  # Always available
+        'reflection_check': True,  # Always available
+        'overall_status': 'full' if (_cnn_available and _yolo_model is not None) else 'partial'
+    }

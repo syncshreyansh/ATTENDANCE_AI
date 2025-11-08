@@ -214,49 +214,88 @@
 
         /* --- Camera Feed --- */
         .camera-feed-placeholder {
-    width: 100%;
-    background: rgba(24, 24, 24, 0.5);
-    backdrop-filter: blur(25px);
-    border: none;
-    border-radius: 12px;
-    box-shadow: none;
-    transition: all 0.3s ease;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: var(--color-text-secondary);
-    font-family: var(--font-mono);
-    position: relative;
-    flex: 1;
-}
+            width: 100%;
+            background: rgba(24, 24, 24, 0.5);
+            backdrop-filter: blur(25px);
+            border: none;
+            border-radius: 12px;
+            box-shadow: none;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--color-text-secondary);
+            font-family: var(--font-mono);
+            position: relative;
+            flex: 1;
+        }
         .camera-feed-placeholder:hover {
             box-shadow: 0 0 30px var(--color-accent-strong-glow);
         }
 
-        /* --- Notification Banner --- */
-        .feed-notification {
+        /* === FIXED: Quality Feedback Notification - Bottom, Transparent, Auto-dismiss === */
+        .quality-feedback-overlay {
             position: absolute;
-            top: 16px;
-            left: 16px;
-            right: 16px;
-            background: rgba(88, 80, 236, 0.9);
+            bottom: 70px; /* Above the control buttons */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75); /* Transparent background */
             backdrop-filter: blur(10px);
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(139, 92, 246, 0.5);
-            font-family: var(--font-body);
-            font-size: 14px;
+            padding: 10px 20px;
+            border-radius: 20px;
             color: white;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 5;
-            box-shadow: 0 4px 12px rgba(88, 80, 236, 0.3);
+            font-size: 13px;
+            z-index: 8; /* Below buttons but above video */
+            transition: all 0.3s ease;
+            display: none; /* Hidden by default */
+            max-width: 90%;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .feed-notification i {
-            font-size: 16px;
+        .quality-feedback-overlay.show {
+            display: block;
+            animation: slideUpFade 0.3s ease;
+        }
+
+        @keyframes slideUpFade {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .quality-feedback-overlay.excellent {
+            background: rgba(22, 163, 74, 0.85);
+            border-color: rgba(34, 197, 94, 0.6);
+        }
+
+        .quality-feedback-overlay.good {
+            background: rgba(234, 179, 8, 0.85);
+            border-color: rgba(250, 204, 21, 0.6);
+        }
+
+        .quality-feedback-overlay.poor {
+            background: rgba(239, 68, 68, 0.85);
+            border-color: rgba(248, 113, 113, 0.6);
+        }
+
+        #qualityMessage {
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        #qualityItems {
+            display: none; /* Hide detailed items, show only main message */
+        }
+
+        .quality-score-bar {
+            display: none; /* Hide score bar for cleaner look */
         }
 
         #liveFeedVideo {
@@ -272,12 +311,155 @@
 
         .feed-placeholder {
             text-align: center;
+            z-index: 1;
         }
 
         .feed-placeholder i {
             font-size: 48px;
             color: var(--color-accent);
             margin-bottom: 16px;
+        }
+
+        /* Feed Controls */
+        .feed-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+            align-items: center;
+        }
+
+        /* Status Indicator */
+        .status-light {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            padding: 8px 14px;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--color-text-secondary);
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-light::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        .status-light.status-offline::before {
+            background-color: var(--color-status-red);
+            box-shadow: 0 0 10px var(--color-status-red);
+        }
+
+        .status-light.status-online::before {
+            background-color: var(--color-status-green);
+            box-shadow: 0 0 15px var(--color-status-green);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
+        }
+
+        /* Recognition Overlay */
+        .recognition-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            padding: 12px 20px;
+            background: rgba(88, 80, 236, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(139, 92, 246, 0.6);
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.9rem;
+            font-family: 'Montserrat', sans-serif;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        .recognition-overlay::before {
+            font-size: 16px;
+            display: inline-block;
+        }
+
+        .recognition-overlay.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .recognition-overlay.success {
+            background: rgba(16, 185, 129, 0.95);
+            border-color: rgba(34, 197, 94, 0.6);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .recognition-overlay.success::before {
+            content: '✓';
+            font-weight: 700;
+            color: white;
+        }
+
+        .recognition-overlay.error {
+            background: rgba(239, 68, 68, 0.95);
+            border-color: rgba(255, 69, 69, 0.6);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .recognition-overlay.error::before {
+            content: '✗';
+            font-weight: 700;
+            color: white;
+        }
+
+        .recognition-overlay.recognizing {
+            background: rgba(88, 80, 236, 0.95);
+            border-color: rgba(139, 92, 246, 0.6);
+            box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
+            animation: recognizingPulse 2s ease-in-out infinite;
+        }
+
+        .recognition-overlay.recognizing::before {
+            content: '⏳';
+            font-size: 16px;
+        }
+
+        @keyframes recognizingPulse {
+            0%, 100% { 
+                box-shadow: 0 4px 12px rgba(88, 80, 236, 0.4);
+            }
+            50% { 
+                box-shadow: 0 6px 16px rgba(88, 80, 236, 0.6);
+            }
         }
 
         /* --- Stats Grid --- */
@@ -397,7 +579,7 @@
         .modal-content {
             width: 90%;
             max-width: 800px;
-            background: rgba(24, 24, 24, 0.7);
+            background: rgba(24, 24, 24, 0.95);
             backdrop-filter: blur(25px);
             border: none;
             border-radius: 12px;
@@ -521,6 +703,53 @@
             display: none !important;
         }
 
+        /* Capture Progress & Effects */
+        .capture-progress {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+            display: none;
+            z-index: 10;
+        }
+
+        .frame-capture-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(0, 224, 240, 0.5);
+            border-radius: 50%;
+            animation: pulse-indicator 1s infinite;
+            display: none;
+            z-index: 10;
+        }
+
+        @keyframes pulse-indicator {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
+        }
+
+        .countdown-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: #00E0F0;
+            font-weight: 700;
+            text-shadow: 0 0 20px rgba(0, 224, 240, 0.8);
+            display: none;
+            z-index: 15;
+        }
+
         /* --- Responsive --- */
         @media (max-width: 1200px) {
             .main-content {
@@ -559,6 +788,26 @@
             .modal-form {
                 order: 1;
             }
+            .feed-controls {
+                flex-direction: row;
+                bottom: 16px;
+                right: 16px;
+                gap: 8px;
+            }
+            
+            .feed-controls .btn {
+                min-width: 90px;
+                font-size: 13px;
+                padding: 8px 14px;
+            }
+            .recognition-overlay {
+                font-size: 0.85rem;
+                padding: 10px 16px;
+                bottom: 16px;
+                left: 16px;
+                right: 16px;
+                max-width: calc(100% - 32px);
+            }
         }
 
         @media (max-width: 500px) {
@@ -570,123 +819,18 @@
                 justify-content: center;
             }
             .feed-controls {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    display: flex;
-    gap: 12px;
-    z-index: 10;
-    align-items: center;
-}
+                flex-direction: column;
+                bottom: 16px;
+                right: 16px;
+                gap: 8px;
+            }
+            
             .feed-controls .btn {
-                justify-content: center;
+                width: 110px;
+                font-size: 13px;
+                padding: 8px 12px;
             }
         }
-
-        /* --- STYLES from previous (multi-shot) merge --- */
-       .quality-feedback-overlay {
-           position: absolute;
-           top: 10px;
-           left: 10px;
-           right: 10px;
-           background: rgba(0, 0, 0, 0.8);
-           backdrop-filter: blur(10px);
-           padding: 12px;
-           border-radius: 8px;
-           color: white;
-           font-size: 14px;
-           z-index: 10;
-           transition: all 0.3s ease;
-       }
-       
-       .quality-feedback-overlay.excellent {
-           background: rgba(22, 163, 74, 0.9);
-           border: 2px solid #16a34a;
-       }
-       
-       .quality-feedback-overlay.good {
-           background: rgba(234, 179, 8, 0.9);
-           border: 2px solid #eab308;
-       }
-       
-       .quality-feedback-overlay.poor {
-           background: rgba(239, 68, 68, 0.9);
-           border: 2px solid #ef4444;
-       }
-       
-       .quality-item {
-           display: flex;
-           align-items: center;
-           margin: 4px 0;
-           font-size: 13px;
-       }
-       
-       .quality-item i {
-           margin-right: 8px;
-           font-size: 14px;
-       }
-       
-       .quality-score-bar {
-           width: 100%;
-           height: 4px;
-           background: rgba(255, 255, 255, 0.2);
-           border-radius: 2px;
-           margin-top: 8px;
-           overflow: hidden;
-       }
-       
-       .quality-score-fill {
-           height: 100%;
-           background: linear-gradient(90deg, #ef4444, #eab308, #16a34a);
-           transition: width 0.5s ease;
-       }
-       
-       .capture-progress {
-           position: absolute;
-           bottom: 16px;
-           left: 50%;
-           transform: translateX(-50%);
-           background: rgba(0, 0, 0, 0.8);
-           padding: 8px 16px;
-           border-radius: 20px;
-           color: white;
-           font-size: 14px;
-           display: none;
-           z-index: 10;
-       }
-       
-       .frame-capture-indicator {
-           position: absolute;
-           top: 50%;
-           left: 50%;
-           transform: translate(-50%, -50%);
-           width: 80px;
-           height: 80px;
-           border: 4px solid rgba(0, 224, 240, 0.5);
-           border-radius: 50%;
-           animation: pulse 1s infinite;
-           display: none;
-           z-index: 10;
-       }
-       
-       @keyframes pulse {
-           0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-           50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
-       }
-       
-       .countdown-overlay {
-           position: absolute;
-           top: 50%;
-           left: 50%;
-           transform: translate(-50%, -50%);
-           font-size: 72px;
-           color: #00E0F0;
-           font-weight: 700;
-           text-shadow: 0 0 20px rgba(0, 224, 240, 0.8);
-           display: none;
-           z-index: 15;
-       }
-       /* --- END OF PREVIOUS MERGE STYLES --- */
     </style>
 </head>
 <body>
@@ -769,12 +913,13 @@
                 <div class="modal-camera-area">
                     
                     <div class="camera-feed-placeholder large" id="enrollmentPreview">
-                        <div class="quality-feedback-overlay" id="qualityFeedback" style="display: none;">
+                        <!-- FIXED: Quality feedback at bottom, transparent, auto-dismiss -->
+                        <div class="quality-feedback-overlay" id="qualityFeedback">
                             <div id="qualityMessage">Analyzing...</div>
                             <div class="quality-score-bar">
                                 <div class="quality-score-fill" id="qualityScoreFill" style="width: 0%"></div>
                             </div>
-                            <div id="qualityItems" style="margin-top: 8px;"></div>
+                            <div id="qualityItems"></div>
                         </div>
                         
                         <div class="countdown-overlay" id="countdownOverlay">3</div>
@@ -835,18 +980,16 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-<!-- Update the status indicator HTML in dashboard.html -->
-<script>
-    // Fixed: Update status text without unusual characters
-    document.addEventListener('DOMContentLoaded', function() {
-        const statusIndicator = document.getElementById('status-indicator');
-        if (statusIndicator) {
-            // Remove any unusual characters
-            statusIndicator.textContent = statusIndicator.classList.contains('status-online') 
-                ? 'Online' 
-                : 'Offline';
-        }
-    });
+    <script>
+        // Fixed: Update status text without unusual characters
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusIndicator = document.getElementById('status-indicator');
+            if (statusIndicator) {
+                statusIndicator.textContent = statusIndicator.classList.contains('status-online') 
+                    ? 'Online' 
+                    : 'Offline';
+            }
+        });
     </script>
 </body>
 </html>
