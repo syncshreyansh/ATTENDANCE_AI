@@ -1,11 +1,10 @@
-# Database models with enhanced security and activity logging
+# models.py - ENHANCED with CoordinatorScope and OTPToken
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import pytz
 
 db = SQLAlchemy()
 
-# Timezone for India (IST)
 IST = pytz.timezone('Asia/Kolkata')
 
 def get_ist_now():
@@ -18,31 +17,27 @@ class Student(db.Model):
     student_id = db.Column(db.String(20), unique=True, nullable=False)
     class_name = db.Column(db.String(20), nullable=False)
     section = db.Column(db.String(10), nullable=False)
-    parent_phone = db.Column(db.String(15), nullable=False)  # Now mandatory
+    parent_phone = db.Column(db.String(15), nullable=False)
     face_encoding = db.Column(db.PickleType, nullable=True)
     enrollment_date = db.Column(db.DateTime, default=get_ist_now)
     status = db.Column(db.String(20), default='active')
     points = db.Column(db.Integer, default=0)
     image_path = db.Column(db.String(200), nullable=True)
-    
-    # New field to track face hash for duplicate detection
     face_hash = db.Column(db.String(64), unique=True, nullable=True)
 
 class Attendance(db.Model):
-    """Main attendance table - stores all historical records"""
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
-    time_in = db.Column(db.DateTime, nullable=True)  # Changed to DateTime for IST
+    time_in = db.Column(db.DateTime, nullable=True)
     time_out = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), nullable=False)
     confidence = db.Column(db.Float, nullable=True)
     blink_verified = db.Column(db.Boolean, default=False)
-    eye_contact_verified = db.Column(db.Boolean, default=False)  # New field
+    eye_contact_verified = db.Column(db.Boolean, default=False)
     points_earned = db.Column(db.Integer, default=0)
 
 class ActivityLog(db.Model):
-    """Enhanced table with spoof detection fields"""
     __tablename__ = 'activity_logs'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -52,11 +47,9 @@ class ActivityLog(db.Model):
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     message = db.Column(db.Text, nullable=False)
     severity = db.Column(db.String(20), default='warning')
-    
-    # NEW FIELDS FOR SPOOF DETECTION
-    spoof_type = db.Column(db.String(100), nullable=True)  # comma-separated or JSON string
+    spoof_type = db.Column(db.String(100), nullable=True)
     spoof_confidence = db.Column(db.Float, nullable=True)
-    detection_details = db.Column(db.Text, nullable=True)  # JSON string with evidence
+    detection_details = db.Column(db.Text, nullable=True)
 
 class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -75,7 +68,6 @@ class SystemLog(db.Model):
     severity = db.Column(db.String(20), default='info')
 
 class AbsenceTracker(db.Model):
-    """New table to track consecutive absences for notifications"""
     __tablename__ = 'absence_tracker'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -86,3 +78,21 @@ class AbsenceTracker(db.Model):
     last_notification_date = db.Column(db.Date, nullable=True)
     
     student = db.relationship('Student', backref='absence_tracker')
+
+# === NEW: Coordinator Scope ===
+class CoordinatorScope(db.Model):
+    __tablename__ = "coordinator_scope"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    class_name = db.Column(db.String(20), nullable=False)
+    section = db.Column(db.String(10), nullable=True)  # None = all sections in class
+
+# === NEW: OTP Token for Password Reset ===
+class OTPToken(db.Model):
+    __tablename__ = 'otp_tokens'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    code = db.Column(db.String(6), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
