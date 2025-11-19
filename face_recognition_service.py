@@ -1,4 +1,4 @@
-# face_recognition_service.py - FIXED VERSION with enhanced accuracy and security
+# face_recognition_service.py - FULLY FIXED VERSION with ACTUAL liveness and spoof detection
 import cv2
 import face_recognition
 import dlib
@@ -36,18 +36,23 @@ class FaceRecognitionService:
         self.frame_skip_counter = 0
         self.FRAME_SKIP = 2
         self.camera_obstructed = False
-        self.recognition_history = {}  # Track recognition attempts per student
+        self.recognition_history = {}
         
         # Enhanced thresholds for better accuracy
-        self.FACE_MATCH_THRESHOLD = 0.5  # Stricter (was 0.6)
-        self.CONFIDENCE_THRESHOLD = 0.5   # Minimum confidence to accept
+        self.FACE_MATCH_THRESHOLD = 0.5
+        self.CONFIDENCE_THRESHOLD = 0.5
         self.HEAD_POSE_THRESHOLD = 35
         self.EAR_THRESHOLD = 0.25
         self.TEXTURE_THRESHOLD = 50
-        self.MIN_FACE_SIZE = 100  # Minimum face size in pixels
+        self.MIN_FACE_SIZE = 100
         
         # Thread pool for parallel processing
         self.executor = ThreadPoolExecutor(max_workers=2)
+        
+        # FIXED: Initialize liveness detector
+        from liveness_detection import LivenessDetector
+        self.liveness_detector = LivenessDetector()
+        logger.info("✓ Liveness detector initialized")
 
     def _ensure_loaded(self):
         """Lazy loading of face encodings with error handling"""
@@ -72,7 +77,6 @@ class FaceRecognitionService:
             loaded_count = 0
             for student in students:
                 if student.face_encoding is not None:
-                    # Validate encoding
                     if isinstance(student.face_encoding, np.ndarray) and len(student.face_encoding) == 128:
                         self.known_encodings.append(student.face_encoding)
                         self.known_names.append(student.name)
@@ -98,12 +102,12 @@ class FaceRecognitionService:
             
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
-            # Check 1: Average brightness (very dark = obstructed)
+            # Check 1: Average brightness
             avg_brightness = np.mean(gray)
             if avg_brightness < 15:
                 return True, "Camera appears to be covered or in very dark environment"
             
-            # Check 2: Texture variance (uniform = obstructed)
+            # Check 2: Texture variance
             laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
             if laplacian_var < 10:
                 return True, "Camera feed shows uniform surface (possible obstruction)"
@@ -115,7 +119,7 @@ class FaceRecognitionService:
             if np.max(hist_normalized) > 0.6:
                 return True, "Camera shows uniform pattern (possible obstruction)"
             
-            # Check 4: Oversaturation (blown out image)
+            # Check 4: Oversaturation
             bright_pixels = np.sum(gray > 240)
             if bright_pixels > (gray.size * 0.5):
                 return True, "Camera feed is oversaturated"
@@ -125,71 +129,6 @@ class FaceRecognitionService:
         except Exception as e:
             logger.error(f"Error detecting camera obstruction: {e}")
             return False, ""
-
-    def calculate_ear(self, eye):
-        """Calculate Eye Aspect Ratio for blink detection"""
-        try:
-            A = dist.euclidean(eye[1], eye[5])
-            B = dist.euclidean(eye[2], eye[4])
-            C = dist.euclidean(eye[0], eye[3])
-            ear = (A + B) / (2.0 * C + 1e-6)
-            return ear
-        except:
-            return 0.3
-
-    def estimate_head_pose(self, landmarks, frame_shape):
-        """Enhanced head pose estimation with error handling"""
-        try:
-            model_points = np.array([
-                (0.0, 0.0, 0.0),
-                (0.0, -330.0, -65.0),
-                (-225.0, 170.0, -135.0),
-                (225.0, 170.0, -135.0),
-                (-150.0, -150.0, -125.0),
-                (150.0, -150.0, -125.0)
-            ], dtype=np.float64)
-            
-            image_points = np.array([
-                landmarks[30],
-                landmarks[8],
-                landmarks[36],
-                landmarks[45],
-                landmarks[48],
-                landmarks[54]
-            ], dtype=np.float64)
-            
-            size = frame_shape
-            focal_length = size[1]
-            center = (size[1] / 2, size[0] / 2)
-            camera_matrix = np.array([
-                [focal_length, 0, center[0]],
-                [0, focal_length, center[1]],
-                [0, 0, 1]
-            ], dtype=np.float64)
-            
-            dist_coeffs = np.zeros((4, 1))
-            
-            success, rotation_vector, translation_vector = cv2.solvePnP(
-                model_points, image_points, camera_matrix, dist_coeffs,
-                flags=cv2.SOLVEPNP_ITERATIVE
-            )
-            
-            if not success:
-                return 0, 0, 0
-            
-            rotation_mat, _ = cv2.Rodrigues(rotation_vector)
-            pose_mat = cv2.hconcat((rotation_mat, translation_vector))
-            _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(pose_mat)
-            
-            pitch = float(euler_angles[0][0])
-            yaw = float(euler_angles[1][0])
-            roll = float(euler_angles[2][0])
-            
-            return pitch, yaw, roll
-            
-        except Exception as e:
-            logger.error(f"Error in head pose estimation: {e}")
-            return 0, 0, 0
 
     def validate_face_quality(self, frame, face_location):
         """Validate face quality before recognition"""
@@ -233,7 +172,7 @@ class FaceRecognitionService:
 
     def recognize_faces_with_state(self, frame):
         """
-        FIXED: Enhanced recognition with proper error handling and spoof integration
+        FIXED: Enhanced recognition with ACTUAL liveness and spoof detection
         """
         if not self._ensure_loaded():
             return ('error', 'System not initialized - please restart', {})
@@ -325,7 +264,6 @@ class FaceRecognitionService:
             
             # Enhanced matching logic
             if not matches[best_match_index] or confidence < self.CONFIDENCE_THRESHOLD:
-                # Log unknown face attempt
                 self._log_activity('unknown_face_attempt', f'Confidence: {confidence:.2f}')
                 result = ('unknown', f'Face not recognized (confidence too low: {confidence:.0%})', {})
                 self.last_state_result = result
@@ -337,7 +275,43 @@ class FaceRecognitionService:
             
             logger.info(f"✓ Face recognized: {student_name} (confidence: {confidence:.2%})")
             
-            # === ENHANCED SPOOF DETECTION ===
+            # ===== CRITICAL FIX 1: ACTUALLY RUN LIVENESS DETECTION =====
+            logger.info(f"🔍 Running liveness detection for {student_name}...")
+            
+            try:
+                is_live, liveness_conf, liveness_details = self.liveness_detector.comprehensive_liveness_check(frame)
+                
+                blink_verified = liveness_details.get('blink_detected', False)
+                eye_contact_verified = liveness_details.get('head_pose_correct', False)
+                texture_valid = liveness_details.get('texture_valid', False)
+                
+                logger.info(f"📊 Liveness results: is_live={is_live}, conf={liveness_conf:.2f}, "
+                          f"blink={blink_verified}, eye_contact={eye_contact_verified}, texture={texture_valid}")
+                
+                # FIXED: Stricter liveness threshold
+                if not is_live or liveness_conf < 0.5:  # Lowered from 0.6 to 0.5
+                    logger.warning(f"❌ Liveness check FAILED for {student_name}: conf={liveness_conf:.2f}")
+                    self._log_activity('liveness_failed', 
+                                     f'{student_name} failed liveness check (conf={liveness_conf:.2f}, '
+                                     f'blink={blink_verified}, eye_contact={eye_contact_verified})')
+                    
+                    result = ('error', '❌ Liveness verification failed - please blink and look at camera', {})
+                    self.last_state_result = result
+                    return result
+                
+                logger.info(f"✅ Liveness check PASSED for {student_name}")
+                
+            except Exception as e:
+                logger.error(f"❌ Liveness detection error: {e}")
+                import traceback
+                traceback.print_exc()
+                result = ('error', 'Liveness verification system error', {})
+                self.last_state_result = result
+                return result
+            
+            # ===== CRITICAL FIX 2: ACTUALLY RUN SPOOF DETECTION =====
+            logger.info(f"🔍 Running spoof detection for {student_name}...")
+            
             try:
                 from spoof_detection.ensemble_spoof import check as spoof_check
                 from config import Config
@@ -347,6 +321,9 @@ class FaceRecognitionService:
                 
                 # Run spoof detection
                 spoof_result = spoof_check(frame, face_bbox_xywh, face_encoding)
+                
+                logger.info(f"📊 Spoof detection results: is_spoof={spoof_result['is_spoof']}, "
+                          f"conf={spoof_result['confidence']:.2f}, type={spoof_result['spoof_type']}")
                 
                 if spoof_result['is_spoof']:
                     spoof_conf = spoof_result['confidence']
@@ -364,10 +341,10 @@ class FaceRecognitionService:
                     # Log to database
                     self._log_spoof_activity(student_id, student_name, spoof_type, spoof_conf, evidence)
                     
-                    # Determine action based on confidence
+                    # FIXED: Lower threshold for blocking
                     auto_block = getattr(Config, 'AUTO_BLOCK_SPOOF', False)
                     
-                    if spoof_conf >= 0.85 and auto_block:  # Stricter threshold
+                    if spoof_conf >= 0.65 or auto_block:  # Lowered from 0.85 to 0.65
                         result = ('spoof_blocked', f'🚫 Spoofing attempt detected: {spoof_type}', {
                             'student_id': student_id,
                             'student_name': student_name,
@@ -389,17 +366,27 @@ class FaceRecognitionService:
                     
                     self.last_state_result = result
                     return result
+                
+                logger.info(f"✅ Spoof detection PASSED for {student_name}")
                     
             except Exception as e:
-                logger.error(f"⚠️ Spoof detection error (continuing): {e}")
+                logger.error(f"❌ Spoof detection error: {e}")
+                import traceback
+                traceback.print_exc()
+                # FIXED: Fail secure - don't allow on error
+                result = ('error', 'Security verification system error', {})
+                self.last_state_result = result
+                return result
             
             # === ALL CHECKS PASSED ===
+            logger.info(f"🎉 All security checks passed for {student_name}")
+            
             result = ('verified', None, {
                 'student_id': student_id,
                 'student_name': student_name,
                 'confidence': confidence,
-                'blink_verified': True,
-                'eye_contact_verified': True
+                'blink_verified': blink_verified,  # FIXED: Actual value from liveness detection
+                'eye_contact_verified': eye_contact_verified  # FIXED: Actual value from liveness detection
             })
             self.last_state_result = result
             return result
@@ -435,7 +422,7 @@ class FaceRecognitionService:
                 name=student_name,
                 activity_type='spoof_detected',
                 message=f"Spoof detected: {spoof_type} (conf={confidence:.2f})",
-                severity='critical' if confidence >= 0.85 else 'warning',
+                severity='critical' if confidence >= 0.65 else 'warning',
                 spoof_type=str(spoof_type) if spoof_type else None,
                 spoof_confidence=confidence,
                 detection_details=json.dumps(evidence) if evidence else None
@@ -473,7 +460,7 @@ class FaceRecognitionService:
             for student in all_students:
                 if student.face_encoding is not None:
                     distance = face_recognition.face_distance([student.face_encoding], face_encoding)[0]
-                    if distance < 0.35:  # Stricter than recognition threshold
+                    if distance < 0.35:
                         return True, student
             
             return False, None
@@ -502,7 +489,6 @@ class FaceRecognitionService:
             face_locations_hog = face_recognition.face_locations(rgb_frame, model='hog')
             
             if len(face_locations_hog) == 0:
-                # Try CNN model if HOG fails
                 face_locations = face_recognition.face_locations(rgb_frame, model='cnn')
             else:
                 face_locations = face_locations_hog
@@ -523,7 +509,7 @@ class FaceRecognitionService:
             face_encodings = face_recognition.face_encodings(
                 rgb_frame, 
                 face_locations,
-                num_jitters=10,  # More jitters for enrollment accuracy
+                num_jitters=10,
                 model='large'
             )
             

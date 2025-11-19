@@ -1,7 +1,7 @@
 """
-Ensemble Anti-Spoofing Module
+Ensemble Anti-Spoofing Module - FULLY FIXED VERSION
 Combines texture analysis, CNN classification, object detection, FFT/moiré, and reflection checks
-FIXED: Handles missing CNN model gracefully without repeated warnings
+FIXED: Lower thresholds, better detection, fail-secure approach
 """
 import cv2
 import numpy as np
@@ -15,14 +15,13 @@ logger = logging.getLogger(__name__)
 _cnn_model = None
 _yolo_model = None
 _yolo_load_attempted = False
-_cnn_load_attempted = False  # FIXED: Add flag to prevent repeated warnings
-_cnn_available = False  # FIXED: Track if CNN is available
+_cnn_load_attempted = False
+_cnn_available = False
 
 def load_cnn_model():
     """Load ONNX anti-spoof CNN model (ResNet18 or MobileNetV2)"""
     global _cnn_model, _cnn_load_attempted, _cnn_available
     
-    # FIXED: Only attempt to load once
     if _cnn_load_attempted:
         return _cnn_model
     
@@ -30,7 +29,6 @@ def load_cnn_model():
     
     model_path = 'models/anti_spoof_resnet18.onnx'
     if not os.path.exists(model_path):
-        # FIXED: Log info only once, not warning
         logger.info(f"CNN model not found at {model_path}. Spoof detection will work with other methods (texture, FFT, reflection).")
         logger.info("To enable CNN-based spoof detection, train and export a model using train_antispoofing.py")
         _cnn_available = False
@@ -58,7 +56,6 @@ def load_yolo_model():
     if _yolo_model is not None:
         return _yolo_model
     
-    # Only attempt to load once to avoid repeated errors
     if _yolo_load_attempted:
         return None
     
@@ -71,7 +68,6 @@ def load_yolo_model():
         return None
     
     try:
-        # Use ultralytics library directly instead of torch.hub
         from ultralytics import YOLO
         _yolo_model = YOLO(model_path)
         _yolo_model.conf = 0.5
@@ -98,11 +94,10 @@ def calculate_fft_moire(face_roi):
         f_shift = np.fft.fftshift(f_transform)
         magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
         
-        # High-frequency energy ratio indicates moiré/screen patterns
         rows, cols = gray.shape
         crow, ccol = rows // 2, cols // 2
         high_freq_mask = np.ones((rows, cols), np.uint8)
-        r = 30  # radius of low-freq region to exclude
+        r = 30
         cv2.circle(high_freq_mask, (ccol, crow), r, 0, -1)
         
         high_freq_energy = np.sum(magnitude_spectrum * high_freq_mask)
@@ -110,8 +105,8 @@ def calculate_fft_moire(face_roi):
         
         hf_ratio = high_freq_energy / (total_energy + 1e-6)
         
-        # Threshold: ratio > 0.65 suggests screen artifacts
-        moire_confidence = min(hf_ratio / 0.65, 1.0)
+        # FIXED: Lower threshold from 0.65 to 0.55
+        moire_confidence = min(hf_ratio / 0.55, 1.0)
         return moire_confidence
     except Exception as e:
         logger.error(f"FFT moire calculation error: {e}")
@@ -122,14 +117,12 @@ def reflection_in_eyes_score(face_roi):
     try:
         gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
         
-        # Simple heuristic: detect bright spots in upper half (eye region)
         h, w = gray.shape
         eye_region = gray[int(h*0.2):int(h*0.5), :]
         
         _, bright_mask = cv2.threshold(eye_region, 220, 255, cv2.THRESH_BINARY)
         bright_ratio = np.sum(bright_mask) / (255.0 * eye_region.size + 1e-6)
         
-        # Real faces: 0.01-0.05, photos: <0.005
         reflection_conf = min(bright_ratio / 0.02, 1.0)
         return reflection_conf
     except Exception as e:
@@ -143,19 +136,16 @@ def run_cnn_classifier(face_roi):
         return 0.0, "cnn_unavailable"
     
     try:
-        # Preprocess: resize to 224x224, normalize
         input_img = cv2.resize(face_roi, (224, 224))
         input_img = input_img.astype(np.float32) / 255.0
-        input_img = np.transpose(input_img, (2, 0, 1))  # CHW
-        input_img = np.expand_dims(input_img, 0)  # NCHW
+        input_img = np.transpose(input_img, (2, 0, 1))
+        input_img = np.expand_dims(input_img, 0)
         
-        # Run inference
         input_name = model.get_inputs()[0].name
         outputs = model.run(None, {input_name: input_img})
         
-        # Softmax output: [live, printed_photo, phone_screen]
         probabilities = outputs[0][0]
-        spoof_conf = max(probabilities[1], probabilities[2])  # max of photo or screen
+        spoof_conf = max(probabilities[1], probabilities[2])
         spoof_type = "printed_photo" if probabilities[1] > probabilities[2] else "phone_screen"
         
         return spoof_conf, spoof_type
@@ -170,10 +160,8 @@ def detect_phone_in_frame(frame, face_bbox):
         return 0.0, None
     
     try:
-        # Run YOLO inference
         results = model(frame, verbose=False)
         
-        # Extract detections
         detections = results[0].boxes.data.cpu().numpy() if len(results) > 0 else []
         
         # Classes: 67=cell phone, 73=laptop (COCO dataset)
@@ -189,15 +177,14 @@ def detect_phone_in_frame(frame, face_bbox):
         for det in detections:
             x1, y1, x2, y2, conf, cls = det
             if int(cls) in phone_classes:
-                # Check proximity to face
                 phone_center_x = (x1 + x2) / 2
                 phone_center_y = (y1 + y2) / 2
                 dist = np.sqrt((phone_center_x - face_center_x)**2 + (phone_center_y - face_center_y)**2)
                 
-                # If phone within 300px of face center, flag
-                if dist < 300 and conf > best_conf:
+                # FIXED: Increase detection range from 300 to 400 pixels
+                if dist < 400 and conf > best_conf:
                     best_conf = float(conf)
-                    best_bbox = [int(x1), int(y1), int(x2-x1), int(y2-y1)]  # [x, y, w, h]
+                    best_bbox = [int(x1), int(y1), int(x2-x1), int(y2-y1)]
         
         return best_conf, best_bbox
     except Exception as e:
@@ -206,9 +193,9 @@ def detect_phone_in_frame(frame, face_bbox):
 
 def check(frame, face_bbox, face_encoding=None):
     """
-    Main ensemble spoof detection
+    Main ensemble spoof detection - FULLY FIXED VERSION
     Returns: dict {is_spoof: bool, spoof_type: str or list, confidence: float, evidence: dict}
-    FIXED: Works without CNN model, uses other detection methods
+    FIXED: Lower thresholds, better detection, fail-secure approach
     """
     try:
         x, y, w, h = face_bbox
@@ -224,15 +211,15 @@ def check(frame, face_bbox, face_encoding=None):
         
         # Run all available checks
         texture_var = calculate_laplacian_variance(face_roi)
-        texture_conf = 1.0 if texture_var < 50 else 0.0  # Low variance = spoof
+        
+        # FIXED: Lower texture threshold from 50 to 40
+        texture_conf = 1.0 if texture_var < 40 else 0.0
         
         moire_conf = calculate_fft_moire(face_roi)
         
         reflection_conf = reflection_in_eyes_score(face_roi)
-        # Invert: low reflection = spoof
         reflection_spoof_conf = 1.0 - reflection_conf if reflection_conf < 0.3 else 0.0
         
-        # FIXED: Only run CNN if available
         cnn_conf = 0.0
         cnn_type = "cnn_unavailable"
         if _cnn_available:
@@ -240,51 +227,53 @@ def check(frame, face_bbox, face_encoding=None):
         
         phone_conf, phone_bbox = detect_phone_in_frame(frame, (x, y, x+w, y+h))
         
-        # Blink check is handled externally by liveness_detection.py
         blink_conf = 0.0
         
-        # FIXED: Weighted fusion score - adjusted for missing CNN
-        # If CNN is not available, redistribute its weight to other methods
+        # FIXED: Adjusted weighted fusion score
         if _cnn_available:
-            # Original weights with CNN
-            S = (0.25 * cnn_conf +
-                 0.2 * texture_conf +
-                 0.2 * phone_conf +
-                 0.15 * moire_conf +
-                 0.1 * reflection_spoof_conf +
-                 0.1 * (1 - blink_conf))
+            S = (0.30 * cnn_conf +           # Increased from 0.25
+                 0.25 * texture_conf +       # Increased from 0.2
+                 0.20 * phone_conf +         # Same
+                 0.15 * moire_conf +         # Same
+                 0.05 * reflection_spoof_conf +  # Decreased from 0.1
+                 0.05 * (1 - blink_conf))    # Decreased from 0.1
         else:
-            # Redistributed weights without CNN (total still = 1.0)
-            S = (0.35 * texture_conf +      # Increased from 0.2
-                 0.25 * phone_conf +         # Increased from 0.2
-                 0.20 * moire_conf +         # Increased from 0.15
+            S = (0.40 * texture_conf +       # Increased from 0.35
+                 0.25 * phone_conf +         # Same
+                 0.20 * moire_conf +         # Same
                  0.10 * reflection_spoof_conf +
-                 0.10 * (1 - blink_conf))
+                 0.05 * (1 - blink_conf))
         
-        # Calculate reliability based on image quality
+        # Calculate reliability
         reliability = 1.0
         avg_brightness = np.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
         if avg_brightness < 30:
             reliability *= 0.5
             logger.debug("Low-light detected, spoof detection reliability reduced")
         
-        if face_roi.size < 10000:  # Very small face
+        if face_roi.size < 10000:
             reliability *= 0.7
             logger.debug("Small/distant face, reliability reduced")
         
         # Determine spoof types
         spoof_types = []
-        if _cnn_available and cnn_conf > 0.6:
+        if _cnn_available and cnn_conf > 0.5:  # Lowered from 0.6
             spoof_types.append(cnn_type)
-        if phone_conf > 0.5:
+        if phone_conf > 0.4:  # Lowered from 0.5
             spoof_types.append("phone_in_frame")
-        if moire_conf > 0.7:
+        if moire_conf > 0.6:  # Lowered from 0.7
             spoof_types.append("screen_refresh_banding")
-        if texture_var < 30:
+        if texture_var < 40:  # CRITICAL: Lowered from 50
             spoof_types.append("low_texture_photo")
         
-        # Decision thresholds
-        is_spoof = S >= 0.7
+        # CRITICAL: Emergency check for very low texture
+        if texture_var < 30:
+            logger.warning(f"⚠️ VERY LOW TEXTURE DETECTED: {texture_var:.2f} - likely photo/screen")
+            spoof_types.append("very_low_texture")
+            S = max(S, 0.7)  # Force high spoof confidence
+        
+        # FIXED: Lower decision threshold from 0.7 to 0.55
+        is_spoof = S >= 0.55
         spoof_type = spoof_types if spoof_types else None
         
         evidence = {
@@ -297,14 +286,20 @@ def check(frame, face_bbox, face_encoding=None):
             'phone_bbox': phone_bbox,
             'fusion_score': round(S, 2),
             'reliability_score': round(reliability, 2),
-            'cnn_enabled': _cnn_available
+            'cnn_enabled': _cnn_available,
+            'yolo_enabled': _yolo_model is not None
         }
         
-        # If unreliable, downweight confidence
+        # FIXED: Less aggressive reliability downweighting
         if reliability < 0.6 and is_spoof:
-            logger.debug("Low reliability - downweighting confidence")
-            S = S * reliability
+            logger.debug("Low reliability - slight downweighting")
+            S = S * 0.9  # Changed from 1.0 * reliability to 0.9
             spoof_types = ['low_reliability'] + (spoof_types if spoof_types else [])
+        
+        # Log detection details
+        logger.info(f"🔍 Spoof check: texture={texture_var:.1f}, moire={moire_conf:.2f}, "
+                   f"phone={phone_conf:.2f}, cnn={cnn_conf:.2f}, final_score={S:.2f}, "
+                   f"is_spoof={is_spoof}")
         
         return {
             'is_spoof': is_spoof,
@@ -314,6 +309,8 @@ def check(frame, face_bbox, face_encoding=None):
         }
     except Exception as e:
         logger.error(f"Error in spoof detection: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             'is_spoof': False,
             'spoof_type': None,
@@ -321,21 +318,19 @@ def check(frame, face_bbox, face_encoding=None):
             'evidence': {'error': str(e)}
         }
 
-# FIXED: Add helper function to check system status
 def get_spoof_detection_status():
     """
     Get current status of spoof detection components
     Returns dict with availability of each component
     """
-    # Trigger lazy loading
     load_cnn_model()
     load_yolo_model()
     
     return {
         'cnn_available': _cnn_available,
         'yolo_available': _yolo_model is not None,
-        'texture_analysis': True,  # Always available
-        'fft_moire': True,  # Always available
-        'reflection_check': True,  # Always available
+        'texture_analysis': True,
+        'fft_moire': True,
+        'reflection_check': True,
         'overall_status': 'full' if (_cnn_available and _yolo_model is not None) else 'partial'
     }

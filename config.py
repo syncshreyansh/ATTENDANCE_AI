@@ -1,4 +1,4 @@
-# config.py - ENHANCED VERSION with OTP and WhatsApp DRY_RUN
+# config.py - FIXED VERSION with proper spoof detection settings
 import os
 from datetime import timedelta
 
@@ -37,38 +37,40 @@ class Config:
     ENROLLMENT_MODEL = 'large'
     DUPLICATE_FACE_THRESHOLD = 0.35
     
-    # Liveness Detection
+    # Liveness Detection - FIXED: Lower thresholds for better detection
     EAR_THRESHOLD = 0.25
     BLINK_CONSECUTIVE_FRAMES = 3
     REQUIRED_BLINKS = 1
     EYE_CONTACT_THRESHOLD = 35
     REQUIRE_EYE_CONTACT = False
-    TEXTURE_QUALITY_THRESHOLD = 50
-    LIVENESS_CONFIDENCE_THRESHOLD = 0.6
+    TEXTURE_QUALITY_THRESHOLD = 40  # FIXED: Lowered from 50 to 40
+    LIVENESS_CONFIDENCE_THRESHOLD = 0.5  # FIXED: Lowered from 0.6 to 0.5
     
-    # Anti-Spoofing Settings
-    AUTO_BLOCK_SPOOF = os.environ.get('AUTO_BLOCK_SPOOF', 'False').lower() == 'true'
-    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.7
-    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.85
-    SPOOF_WEIGHT_CNN = 0.25
-    SPOOF_WEIGHT_TEXTURE = 0.20
-    SPOOF_WEIGHT_PHONE = 0.20
-    SPOOF_WEIGHT_MOIRE = 0.15
-    SPOOF_WEIGHT_REFLECTION = 0.10
-    SPOOF_WEIGHT_BLINK = 0.10
+    # Anti-Spoofing Settings - FIXED: Enable by default and lower thresholds
+    AUTO_BLOCK_SPOOF = os.environ.get('AUTO_BLOCK_SPOOF', 'True').lower() == 'true'  # FIXED: Changed default to True
+    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.55  # FIXED: Lowered from 0.7 to 0.55
+    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.65  # FIXED: Lowered from 0.85 to 0.65
+    
+    # FIXED: Adjusted spoof weights for better balance
+    SPOOF_WEIGHT_CNN = 0.30  # Increased from 0.25
+    SPOOF_WEIGHT_TEXTURE = 0.25  # Increased from 0.20
+    SPOOF_WEIGHT_PHONE = 0.20  # Same
+    SPOOF_WEIGHT_MOIRE = 0.15  # Same
+    SPOOF_WEIGHT_REFLECTION = 0.05  # Decreased from 0.10
+    SPOOF_WEIGHT_BLINK = 0.05  # Decreased from 0.10
     
     # Model paths
     ANTI_SPOOF_CNN_MODEL = 'models/anti_spoof_resnet18.onnx'
     PHONE_DETECTOR_MODEL = 'models/yolov5n.pt'
     LANDMARK_PREDICTOR = 'shape_predictor_68_face_landmarks.dat'
     
-    # === NEW: WhatsApp API with DRY_RUN ===
+    # WhatsApp API with DRY_RUN
     WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN") or ""
     WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID") or ""
-    WHATSAPP_DRY_RUN = bool(int(os.environ.get("WHATSAPP_DRY_RUN", "1")))  # 1=log only, 0=real calls
+    WHATSAPP_DRY_RUN = bool(int(os.environ.get("WHATSAPP_DRY_RUN", "1")))
     WHATSAPP_WEBHOOK_VERIFY_TOKEN = os.environ.get('WHATSAPP_WEBHOOK_VERIFY_TOKEN')
     
-    # === NEW: OTP Settings ===
+    # OTP Settings
     OTP_EXP_MINUTES = int(os.environ.get("OTP_EXP_MINUTES", "10"))
     OTP_RESEND_COOLDOWN_SEC = int(os.environ.get("OTP_RESEND_COOLDOWN_SEC", "60"))
     
@@ -115,12 +117,24 @@ class Config:
         if not 0 < cls.RECOGNITION_CONFIDENCE_MIN < 1:
             errors.append("RECOGNITION_CONFIDENCE_MIN must be between 0 and 1")
         
+        # FIXED: Validate new spoof weights
         total_weight = (cls.SPOOF_WEIGHT_CNN + cls.SPOOF_WEIGHT_TEXTURE + 
                        cls.SPOOF_WEIGHT_PHONE + cls.SPOOF_WEIGHT_MOIRE + 
                        cls.SPOOF_WEIGHT_REFLECTION + cls.SPOOF_WEIGHT_BLINK)
         
         if not 0.95 <= total_weight <= 1.05:
             errors.append(f"Spoof weights must sum to ~1.0 (currently: {total_weight})")
+        
+        # Warn if models are missing
+        if not os.path.exists(cls.ANTI_SPOOF_CNN_MODEL):
+            print(f"⚠️  Warning: CNN spoof model not found at {cls.ANTI_SPOOF_CNN_MODEL}")
+            print("   Spoof detection will work with reduced accuracy (texture + FFT only)")
+            print("   To improve: Train model using train_antispoofing.py")
+        
+        if not os.path.exists(cls.PHONE_DETECTOR_MODEL):
+            print(f"⚠️  Warning: YOLO phone detector not found at {cls.PHONE_DETECTOR_MODEL}")
+            print("   Phone-in-frame detection disabled")
+            print("   Download: wget https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5n.pt -O models/yolov5n.pt")
         
         return errors
     
@@ -132,6 +146,10 @@ class Config:
             'confidence_min': cls.RECOGNITION_CONFIDENCE_MIN,
             'min_face_size': cls.MIN_FACE_SIZE_PIXELS,
             'spoof_auto_block': cls.AUTO_BLOCK_SPOOF,
+            'spoof_threshold_flag': cls.SPOOF_CONFIDENCE_THRESHOLD_FLAG,
+            'spoof_threshold_block': cls.SPOOF_CONFIDENCE_THRESHOLD_BLOCK,
+            'liveness_conf_threshold': cls.LIVENESS_CONFIDENCE_THRESHOLD,
+            'texture_threshold': cls.TEXTURE_QUALITY_THRESHOLD,
             'whatsapp_dry_run': cls.WHATSAPP_DRY_RUN,
             'otp_expiry_minutes': cls.OTP_EXP_MINUTES,
             'target_fps': cls.TARGET_FPS
@@ -140,7 +158,7 @@ class Config:
 # Validate on import
 validation_errors = Config.validate()
 if validation_errors:
-    print("⚠️ Configuration Errors:")
+    print("⚠️  Configuration Errors:")
     for error in validation_errors:
         print(f"  - {error}")
 else:
