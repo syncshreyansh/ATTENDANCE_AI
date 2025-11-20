@@ -37,27 +37,27 @@ class Config:
     ENROLLMENT_MODEL = 'large'
     DUPLICATE_FACE_THRESHOLD = 0.35
     
-    # Liveness Detection - FIXED: Lower thresholds for better detection
-    EAR_THRESHOLD = 0.25
-    BLINK_CONSECUTIVE_FRAMES = 3
+    # Liveness Detection - CRITICAL: Mandatory blink, strict thresholds
+    EAR_THRESHOLD = 0.21
+    BLINK_CONSECUTIVE_FRAMES = 2
     REQUIRED_BLINKS = 1
     EYE_CONTACT_THRESHOLD = 35
     REQUIRE_EYE_CONTACT = False
-    TEXTURE_QUALITY_THRESHOLD = 35  # Stricter texture requirement
-    LIVENESS_CONFIDENCE_THRESHOLD = 0.6  # Stricter liveness confidence
+    TEXTURE_QUALITY_THRESHOLD = 45
+    LIVENESS_CONFIDENCE_THRESHOLD = 0.5
     
-    # Anti-Spoofing Settings - FIXED: Enable by default and lower thresholds
-    AUTO_BLOCK_SPOOF = os.environ.get('AUTO_BLOCK_SPOOF', 'True').lower() == 'true'  # FIXED: Changed default to True
-    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.50
-    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.55
+    # Anti-Spoofing Settings - CRITICAL: Aggressive blocking
+    AUTO_BLOCK_SPOOF = True
+    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.40
+    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.45
     
-    # FIXED: Adjusted spoof weights for better balance
-    SPOOF_WEIGHT_CNN = 0.30  # Increased from 0.25
-    SPOOF_WEIGHT_TEXTURE = 0.25  # Increased from 0.20
-    SPOOF_WEIGHT_PHONE = 0.20  # Same
-    SPOOF_WEIGHT_MOIRE = 0.15  # Same
-    SPOOF_WEIGHT_REFLECTION = 0.05  # Decreased from 0.10
-    SPOOF_WEIGHT_BLINK = 0.05  # Decreased from 0.10
+    # CRITICAL: Prioritize phone/texture detection
+    SPOOF_WEIGHT_CNN = 0.25
+    SPOOF_WEIGHT_TEXTURE = 0.30
+    SPOOF_WEIGHT_PHONE = 0.30
+    SPOOF_WEIGHT_MOIRE = 0.10
+    SPOOF_WEIGHT_REFLECTION = 0.03
+    SPOOF_WEIGHT_BLINK = 0.02
     
     # Model paths
     ANTI_SPOOF_CNN_MODEL = 'models/anti_spoof_resnet18.onnx'

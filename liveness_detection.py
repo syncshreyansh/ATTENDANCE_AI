@@ -23,10 +23,10 @@ class LivenessDetector:
             self.predictor = None
         
         # FIXED: More lenient thresholds
-        self.EAR_THRESHOLD = 0.23  # Eye Aspect Ratio for blink (stricter requirement)
+        self.EAR_THRESHOLD = 0.21  # Eye Aspect Ratio for blink (stricter requirement)
         self.MAR_THRESHOLD = 0.6   # Mouth Aspect Ratio
         self.HEAD_POSE_THRESHOLD = 30  # Stricter head pose requirement
-        self.TEXTURE_THRESHOLD = 40   # FIXED: Lowered from 80 to 40
+        self.TEXTURE_THRESHOLD = 45   # CRITICAL: Higher texture requirement
         
         # State tracking
         self.blink_counter = 0
@@ -230,13 +230,14 @@ class LivenessDetector:
                     verification_scores['blink'] = 1.0
                 self.blink_counter = 0
             
-            # Give partial credit if eyes are moving at all
-            if ear < 0.35:  # Very lenient
-                verification_scores['blink'] = max(verification_scores['blink'], 0.6)
-            
-            # Mandatory blink requirement
-            if verification_scores['blink'] == 0:
-                return False, 0.0, {'blink_detected': False, 'message': 'Blink required'}
+            # CRITICAL: Mandatory blink requirement - FAIL IMMEDIATELY if no blink
+            if verification_scores['blink'] < 1.0:
+                logger.warning(f"❌ BLINK FAILED: score={verification_scores['blink']}")
+                return False, 0.0, {
+                    'blink_detected': False,
+                    'message': 'Please blink clearly to verify you are real',
+                    'ear': ear
+                }
             
             # 2. Mouth Movement Detection (OPTIONAL - bonus points)
             mouth = landmarks_np[48:68]
@@ -265,30 +266,32 @@ class LivenessDetector:
             texture_quality = 0
             if face_roi.size > 0:
                 texture_quality = self.detect_texture_quality(face_roi)
-                # FIXED: Much lower threshold
-                if texture_quality > self.TEXTURE_THRESHOLD:
+                # CRITICAL: Strict texture requirement - NO partial credit
+                if texture_quality >= self.TEXTURE_THRESHOLD:
                     verification_scores['texture'] = 1.0
-                elif texture_quality > (self.TEXTURE_THRESHOLD * 0.6):  # Partial credit
-                    verification_scores['texture'] = 0.7
-                elif texture_quality > (self.TEXTURE_THRESHOLD * 0.4):
-                    verification_scores['texture'] = 0.4
+                elif texture_quality >= (self.TEXTURE_THRESHOLD * 0.8):
+                    verification_scores['texture'] = 0.5
+                else:
+                    verification_scores['texture'] = 0.0
             
-            # FIXED: Calculate overall confidence with stricter logic
+            # FIXED: Blink is now MANDATORY - no bypassing
+            blink_score = verification_scores['blink']
             texture_score = verification_scores['texture']
             head_pose_score = verification_scores['head_pose']
-            blink_score = verification_scores['blink']
             
-            if texture_score >= 0.4 or head_pose_score >= 0.4:
-                confidence = max(texture_score, head_pose_score)
-                if texture_score >= 0.4 and head_pose_score >= 0.4:
-                    confidence = min((texture_score + head_pose_score) / 2 + 0.2, 1.0)
+            if blink_score < 1.0:
+                is_live = False
+                confidence = 0.0
             else:
-                confidence = (texture_score + head_pose_score + blink_score) / 3
-            
-            is_live = confidence >= 0.6
+                if texture_score >= 0.4 and head_pose_score >= 0.4:
+                    confidence = (texture_score + head_pose_score) / 2
+                else:
+                    confidence = (texture_score + head_pose_score + blink_score) / 3
+                
+                is_live = confidence >= 0.5
             
             details = {
-                'blink_detected': verification_scores['blink'] > 0.5,
+                'blink_detected': verification_scores['blink'] >= 1.0,
                 'mouth_movement': verification_scores['mouth_movement'] > 0,
                 'head_pose_correct': verification_scores['head_pose'] > 0,
                 'texture_valid': verification_scores['texture'] > 0,

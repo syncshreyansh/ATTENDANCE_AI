@@ -275,7 +275,12 @@ def check(frame, face_bbox, face_encoding=None):
         texture_var = calculate_laplacian_variance(face_roi)
         
         # Stricter texture threshold
-        texture_conf = 1.0 if texture_var < 35 else 0.0
+        if texture_var < 50:
+            texture_conf = 1.0
+        elif texture_var < 80:
+            texture_conf = 0.7
+        else:
+            texture_conf = 0.0
         
         moire_conf = calculate_fft_moire(face_roi)
         
@@ -296,46 +301,63 @@ def check(frame, face_bbox, face_encoding=None):
         
         blink_conf = 0.0
         
-        # Emergency checks before fusion
-        if texture_var < 30:
+        # CRITICAL: Emergency texture check - IMMEDIATE rejection
+        if texture_var < 45:
+            logger.critical(f"🚨 EMERGENCY BLOCK: texture={texture_var:.1f} (threshold=45)")
             return {
                 'is_spoof': True,
-                'spoof_type': ['very_low_texture_photo'],
-                'confidence': 0.95,
-                'evidence': {'texture_variance': texture_var, 'reason': 'texture_too_low'}
+                'spoof_type': ['very_low_texture_photo_or_screen'],
+                'confidence': 0.98,
+                'evidence': {
+                    'texture_variance': texture_var,
+                    'threshold': 45,
+                    'reason': 'TEXTURE_TOO_LOW_EMERGENCY_BLOCK'
+                }
             }
         
-        # CRITICAL: IMMEDIATE rejection for phone detection
-        if phone_conf > 0.5:
+        # CRITICAL: IMMEDIATE rejection for phone detection - LOWER threshold
+        if phone_conf > 0.35:
             logger.critical(f"🚨 PHONE DETECTED: conf={phone_conf:.2f}, bbox={phone_bbox}")
             return {
                 'is_spoof': True,
                 'spoof_type': ['phone_screen_detected'],
-                'confidence': min(phone_conf + 0.2, 0.95),
+                'confidence': min(phone_conf + 0.3, 0.99),
                 'evidence': {
                     'phone_confidence': phone_conf,
                     'phone_bbox': phone_bbox,
                     'detection_method': 'yolo' if _yolo_model else 'edge_detection',
-                    'reason': 'PHONE_IN_FRAME'
+                    'reason': 'PHONE_IN_FRAME_IMMEDIATE_BLOCK'
+                }
+            }
+        
+        # FIXED: Detect low texture with moire patterns (screens/photos)
+        if texture_var < 60 and moire_conf > 0.5:
+            logger.critical(f"🚨 SCREEN/PHOTO DETECTED: texture={texture_var:.2f}, moire={moire_conf:.2f}")
+            return {
+                'is_spoof': True,
+                'spoof_type': ['screen_or_photo_detected'],
+                'confidence': 0.90,
+                'evidence': {
+                    'texture_variance': texture_var,
+                    'moire_confidence': moire_conf,
+                    'reason': 'LOW_TEXTURE_WITH_MOIRE'
                 }
             }
         
         # Adjusted weighted fusion score
         if _cnn_available:
-            S = (0.30 * cnn_conf +
-                 0.25 * texture_conf +
-                 0.25 * phone_conf +
+            S = (0.25 * cnn_conf +
+                 0.30 * texture_conf +
+                 0.30 * phone_conf +
+                 0.10 * moire_conf +
+                 0.03 * glare_conf +
+                 0.02 * reflection_spoof_conf)
+        else:
+            S = (0.40 * texture_conf +
+                 0.40 * phone_conf +
                  0.10 * moire_conf +
                  0.05 * glare_conf +
-                 0.03 * reflection_spoof_conf +
-                 0.02 * (1 - blink_conf))
-        else:
-            S = (0.35 * texture_conf +
-                 0.30 * phone_conf +
-                 0.15 * moire_conf +
-                 0.10 * glare_conf +
-                 0.08 * reflection_spoof_conf +
-                 0.02 * (1 - blink_conf))
+                 0.05 * reflection_spoof_conf)
         
         # Calculate reliability
         reliability = 1.0
@@ -365,8 +387,8 @@ def check(frame, face_bbox, face_encoding=None):
             spoof_types.append("very_low_texture")
             S = max(S, 0.7)  # Force high spoof confidence
         
-        # Lower decision threshold for stricter blocking
-        is_spoof = S >= 0.50
+        # CRITICAL: Lower decision threshold for aggressive blocking
+        is_spoof = S >= 0.40
         spoof_type = spoof_types if spoof_types else None
         
         evidence = {

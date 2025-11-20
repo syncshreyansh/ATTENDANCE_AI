@@ -288,24 +288,25 @@ class FaceRecognitionService:
                 blink_verified = liveness_details.get('blink_detected', False)
                 eye_contact_verified = liveness_details.get('head_pose_correct', False)
                 texture_valid = liveness_details.get('texture_valid', False)
+                blink_score = liveness_details.get('scores', {}).get('blink', 0.0)
                 
                 logger.info(f"📊 Liveness results: is_live={is_live}, conf={liveness_conf:.2f}, "
                           f"blink={blink_verified}, eye_contact={eye_contact_verified}, texture={texture_valid}")
                 
-                # Enforce mandatory blink before proceeding
-                if not blink_verified:
-                    logger.warning(f"❌ No blink detected for {student_name}")
+                # CRITICAL: Enforce mandatory blink before proceeding
+                if blink_score < 1.0:
+                    logger.warning(f"❌ Blink verification failed for {student_name}: score={blink_score}")
                     self._log_activity('no_blink_detected', 
-                                     f'{student_name} failed - no blink detected')
-                    result = ('error', '❌ Please blink to verify you are real', {})
+                                     f'{student_name} - NO BLINK DETECTED')
+                    result = ('error', '❌ Please BLINK CLEARLY to verify you are real', {})
                     self.last_state_result = result
                     return result
                 
-                # Stricter liveness threshold
-                if not is_live or liveness_conf < 0.6:
-                    logger.warning(f"❌ Liveness check FAILED for {student_name}: conf={liveness_conf:.2f}")
+                # CRITICAL: Stricter liveness threshold - MUST PASS
+                if not is_live or liveness_conf < 0.7:
+                    logger.warning(f"❌ LIVENESS FAILED for {student_name}: conf={liveness_conf:.2f}")
                     self._log_activity('liveness_failed', 
-                                     f'{student_name} failed liveness check (conf={liveness_conf:.2f}, '
+                                     f'{student_name} - LIVENESS FAILED (conf={liveness_conf:.2f}, '
                                      f'blink={blink_verified}, eye_contact={eye_contact_verified})')
                     
                     result = ('error', '❌ Liveness verification failed - please blink and look at camera', {})
@@ -354,11 +355,11 @@ class FaceRecognitionService:
                     # Log to database
                     self._log_spoof_activity(student_id, student_name, spoof_type, spoof_conf, evidence)
                     
-                    # Aggressive blocking with stricter threshold
-                    auto_block = getattr(Config, 'AUTO_BLOCK_SPOOF', True)
+                    # CRITICAL: Aggressive blocking - ALWAYS block if confidence >= 0.45
+                    auto_block = True
                     
-                    if spoof_conf >= 0.55 or auto_block:
-                        result = ('spoof_blocked', f'🚫 Spoofing attempt detected: {spoof_type}', {
+                    if spoof_conf >= 0.45:
+                        result = ('spoof_blocked', f'🚫 SPOOFING BLOCKED: {spoof_type}', {
                             'student_id': student_id,
                             'student_name': student_name,
                             'spoof_type': spoof_type,
