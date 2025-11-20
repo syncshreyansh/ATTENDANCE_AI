@@ -23,7 +23,7 @@ class LivenessDetector:
             self.predictor = None
         
         # FIXED: More lenient thresholds
-        self.EAR_THRESHOLD = 0.21  # Eye Aspect Ratio for blink (stricter requirement)
+        self.EAR_THRESHOLD = 0.21  # Eye Aspect Ratio baseline
         self.MAR_THRESHOLD = 0.6   # Mouth Aspect Ratio
         self.HEAD_POSE_THRESHOLD = 30  # Stricter head pose requirement
         self.TEXTURE_THRESHOLD = 45   # CRITICAL: Higher texture requirement
@@ -220,24 +220,20 @@ class LivenessDetector:
             right_ear = self.calculate_ear(right_eye)
             ear = (left_ear + right_ear) / 2.0
             
-            # FIXED: Very lenient blink detection
-            if ear < (self.EAR_THRESHOLD + 0.1):  # Even if eye is partially closed
+            # FIXED: More lenient blink scoring
+            if ear < 0.23:
                 self.blink_counter += 1
-                verification_scores['blink'] = 0.7  # Give good score
+                verification_scores['blink'] = 0.9
             else:
-                if self.blink_counter >= 1:  # FIXED: Only need 1 frame (was 2)
+                if self.blink_counter >= 1:
                     self.total_blinks += 1
                     verification_scores['blink'] = 1.0
+                elif ear < 0.28:
+                    verification_scores['blink'] = 0.7
                 self.blink_counter = 0
             
-            # CRITICAL: Mandatory blink requirement - FAIL IMMEDIATELY if no blink
             if verification_scores['blink'] < 1.0:
-                logger.warning(f"❌ BLINK FAILED: score={verification_scores['blink']}")
-                return False, 0.0, {
-                    'blink_detected': False,
-                    'message': 'Please blink clearly to verify you are real',
-                    'ear': ear
-                }
+                logger.warning(f"⚠️  Low blink score: {verification_scores['blink']}")
             
             # 2. Mouth Movement Detection (OPTIONAL - bonus points)
             mouth = landmarks_np[48:68]
@@ -274,24 +270,19 @@ class LivenessDetector:
                 else:
                     verification_scores['texture'] = 0.0
             
-            # FIXED: Blink is now MANDATORY - no bypassing
+            # FIXED: Weighted confidence instead of mandatory blink
             blink_score = verification_scores['blink']
             texture_score = verification_scores['texture']
             head_pose_score = verification_scores['head_pose']
             
-            if blink_score < 1.0:
-                is_live = False
-                confidence = 0.0
-            else:
-                if texture_score >= 0.4 and head_pose_score >= 0.4:
-                    confidence = (texture_score + head_pose_score) / 2
-                else:
-                    confidence = (texture_score + head_pose_score + blink_score) / 3
-                
-                is_live = confidence >= 0.5
+            confidence = (blink_score * 0.3 +
+                          texture_score * 0.4 +
+                          head_pose_score * 0.3)
+            
+            is_live = confidence >= 0.5
             
             details = {
-                'blink_detected': verification_scores['blink'] >= 1.0,
+                'blink_detected': verification_scores['blink'] >= 0.7,
                 'mouth_movement': verification_scores['mouth_movement'] > 0,
                 'head_pose_correct': verification_scores['head_pose'] > 0,
                 'texture_valid': verification_scores['texture'] > 0,

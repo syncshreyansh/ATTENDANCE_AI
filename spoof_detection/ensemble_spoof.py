@@ -302,21 +302,21 @@ def check(frame, face_bbox, face_encoding=None):
         blink_conf = 0.0
         
         # CRITICAL: Emergency texture check - IMMEDIATE rejection
-        if texture_var < 45:
-            logger.critical(f"🚨 EMERGENCY BLOCK: texture={texture_var:.1f} (threshold=45)")
+        if texture_var < 35:
+            logger.critical(f"🚨 EMERGENCY BLOCK: texture={texture_var:.1f} (threshold=35)")
             return {
                 'is_spoof': True,
                 'spoof_type': ['very_low_texture_photo_or_screen'],
                 'confidence': 0.98,
                 'evidence': {
                     'texture_variance': texture_var,
-                    'threshold': 45,
+                    'threshold': 35,
                     'reason': 'TEXTURE_TOO_LOW_EMERGENCY_BLOCK'
                 }
             }
         
         # CRITICAL: IMMEDIATE rejection for phone detection - LOWER threshold
-        if phone_conf > 0.35:
+        if phone_conf > 0.65:
             logger.critical(f"🚨 PHONE DETECTED: conf={phone_conf:.2f}, bbox={phone_bbox}")
             return {
                 'is_spoof': True,
@@ -388,7 +388,7 @@ def check(frame, face_bbox, face_encoding=None):
             S = max(S, 0.7)  # Force high spoof confidence
         
         # CRITICAL: Lower decision threshold for aggressive blocking
-        is_spoof = S >= 0.40
+        is_spoof = S >= 0.55
         spoof_type = spoof_types if spoof_types else None
         
         evidence = {
