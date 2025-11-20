@@ -1,4 +1,4 @@
-# face_recognition_service.py - FULLY WORKING VERSION
+# face_recognition_service.py - FIXED VERSION - Removed quick_liveness_check error
 import cv2
 import face_recognition
 import dlib
@@ -41,7 +41,7 @@ class FaceRecognitionService:
         # FIXED: Lenient thresholds
         self.FACE_MATCH_THRESHOLD = 0.5
         self.CONFIDENCE_THRESHOLD = 0.5
-        self.MIN_FACE_SIZE = 80  # Smaller minimum
+        self.MIN_FACE_SIZE = 80
         
         # Thread pool
         self.executor = ThreadPoolExecutor(max_workers=2)
@@ -275,7 +275,7 @@ class FaceRecognitionService:
                 self.last_state_result = result
                 return result
             
-            # STEP 2: Run liveness detection
+            # STEP 2: Run liveness detection - FIXED: Use correct method name
             try:
                 is_live, liveness_conf, liveness_details = self.liveness_detector.comprehensive_liveness_check(frame)
                 

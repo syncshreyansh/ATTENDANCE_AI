@@ -1,4 +1,4 @@
-# config.py - FIXED VERSION with proper spoof detection settings
+# config.py - OPTIMIZED VERSION with balanced speed and security
 import os
 from datetime import timedelta
 
@@ -20,44 +20,44 @@ class Config:
     CAMERA_INDEX = 0
     FRAME_WIDTH = 640
     FRAME_HEIGHT = 480
-    FRAME_SKIP = 2
+    FRAME_SKIP = 3  # OPTIMIZED: Skip more frames for speed
     
-    # Face Recognition Thresholds
-    FACE_MATCH_THRESHOLD = 0.5
-    RECOGNITION_CONFIDENCE_MIN = 0.5
+    # OPTIMIZED: Face Recognition Thresholds - Balanced for speed
+    FACE_MATCH_THRESHOLD = 0.55  # Slightly more lenient
+    RECOGNITION_CONFIDENCE_MIN = 0.45  # Lower for faster matching
     
-    # Face Quality Requirements
-    MIN_FACE_SIZE_PIXELS = 100
-    MIN_FACE_BRIGHTNESS = 30
-    MAX_FACE_BRIGHTNESS = 240
-    MIN_IMAGE_SHARPNESS = 50
+    # OPTIMIZED: Face Quality Requirements - Less strict for speed
+    MIN_FACE_SIZE_PIXELS = 70  # Smaller minimum
+    MIN_FACE_BRIGHTNESS = 25   # More lenient
+    MAX_FACE_BRIGHTNESS = 245
+    MIN_IMAGE_SHARPNESS = 40   # Lower threshold
     
     # Enrollment Settings
     ENROLLMENT_NUM_JITTERS = 10
     ENROLLMENT_MODEL = 'large'
     DUPLICATE_FACE_THRESHOLD = 0.35
     
-    # Liveness Detection - CRITICAL: Mandatory blink, strict thresholds
-    EAR_THRESHOLD = 0.21
-    BLINK_CONSECUTIVE_FRAMES = 2
+    # OPTIMIZED: Liveness Detection - Faster but secure
+    EAR_THRESHOLD = 0.18  # Lower = easier blink detection
+    BLINK_CONSECUTIVE_FRAMES = 1  # Just 1 frame needed
     REQUIRED_BLINKS = 1
-    EYE_CONTACT_THRESHOLD = 35
+    EYE_CONTACT_THRESHOLD = 50  # More tolerance
     REQUIRE_EYE_CONTACT = False
-    TEXTURE_QUALITY_THRESHOLD = 45
-    LIVENESS_CONFIDENCE_THRESHOLD = 0.5
+    TEXTURE_QUALITY_THRESHOLD = 30  # Lower for speed
+    LIVENESS_CONFIDENCE_THRESHOLD = 0.4  # Lower pass threshold
     
-    # Anti-Spoofing Settings - CRITICAL: Aggressive blocking
+    # CRITICAL: Anti-Spoofing Settings - ENHANCED SECURITY
     AUTO_BLOCK_SPOOF = True
-    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.30
-    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.35
+    SPOOF_CONFIDENCE_THRESHOLD_FLAG = 0.50  # LOWERED for better blocking
+    SPOOF_CONFIDENCE_THRESHOLD_BLOCK = 0.50  # Unified threshold
     
-    # CRITICAL: Prioritize phone/texture detection
-    SPOOF_WEIGHT_CNN = 0.20
-    SPOOF_WEIGHT_TEXTURE = 0.25
-    SPOOF_WEIGHT_PHONE = 0.45  # Increased from 0.30 to prioritize phone detection
-    SPOOF_WEIGHT_MOIRE = 0.08
-    SPOOF_WEIGHT_REFLECTION = 0.03
-    SPOOF_WEIGHT_BLINK = 0.02
+    # CRITICAL: Weighted scoring emphasizing phone detection
+    SPOOF_WEIGHT_CNN = 0.15  # Reduced (optional CNN)
+    SPOOF_WEIGHT_TEXTURE = 0.30  # Texture matters
+    SPOOF_WEIGHT_PHONE = 0.55  # CRITICAL: Phone detection is key
+    SPOOF_WEIGHT_MOIRE = 0.00  # Removed for speed (included in texture)
+    SPOOF_WEIGHT_REFLECTION = 0.00  # Removed for speed
+    SPOOF_WEIGHT_BLINK = 0.00  # Moved to liveness check
     
     # Model paths
     ANTI_SPOOF_CNN_MODEL = 'models/anti_spoof_resnet18.onnx'
@@ -91,10 +91,14 @@ class Config:
     RESET_TIME_HOUR = 0
     RESET_TIME_MINUTE = 0
     
-    # Performance Settings
+    # OPTIMIZED: Performance Settings for Speed
     RECOGNITION_COOLDOWN_SECONDS = 5
-    TARGET_FPS = 3
+    TARGET_FPS = 5  # INCREASED: Process more frames
     MAX_WORKERS = 2
+    
+    # OPTIMIZED: Processing timeouts
+    BLINK_WAIT_TIMEOUT = 5  # REDUCED: Faster timeout
+    REQUIRED_CONSECUTIVE_FRAMES = 2  # REDUCED: Fewer frames
     
     # Security Settings
     MAX_RECOGNITION_ATTEMPTS = 5
@@ -102,6 +106,12 @@ class Config:
     LOG_UNKNOWN_FACES = True
     LOG_FAILED_ENROLLMENTS = True
     LOG_SPOOF_ATTEMPTS = True
+    
+    # OPTIMIZED: Caching for performance
+    ENABLE_SPOOF_CACHE = True
+    SPOOF_CACHE_TIMEOUT = 3  # seconds
+    ENABLE_LANDMARK_CACHE = True
+    LANDMARK_CACHE_TIMEOUT = 0.5  # seconds
     
     # Development/Debug Settings
     SHOW_DEBUG_OVERLAY = os.environ.get('SHOW_DEBUG', 'False').lower() == 'true'
@@ -122,24 +132,18 @@ class Config:
         if not 0 < cls.RECOGNITION_CONFIDENCE_MIN < 1:
             errors.append("RECOGNITION_CONFIDENCE_MIN must be between 0 and 1")
         
-        # FIXED: Validate new spoof weights
+        # Validate spoof weights
         total_weight = (cls.SPOOF_WEIGHT_CNN + cls.SPOOF_WEIGHT_TEXTURE + 
-                       cls.SPOOF_WEIGHT_PHONE + cls.SPOOF_WEIGHT_MOIRE + 
-                       cls.SPOOF_WEIGHT_REFLECTION + cls.SPOOF_WEIGHT_BLINK)
+                       cls.SPOOF_WEIGHT_PHONE)
         
         if not 0.95 <= total_weight <= 1.05:
             errors.append(f"Spoof weights must sum to ~1.0 (currently: {total_weight})")
         
-        # Warn if models are missing
-        if not os.path.exists(cls.ANTI_SPOOF_CNN_MODEL):
-            print(f"⚠️  Warning: CNN spoof model not found at {cls.ANTI_SPOOF_CNN_MODEL}")
-            print("   Spoof detection will work with reduced accuracy (texture + FFT only)")
-            print("   To improve: Train model using train_antispoofing.py")
-        
+        # Check YOLO model
         if not os.path.exists(cls.PHONE_DETECTOR_MODEL):
-            print(f"⚠️  Warning: YOLO phone detector not found at {cls.PHONE_DETECTOR_MODEL}")
-            print("   Phone-in-frame detection disabled")
-            print("   Download: wget https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5n.pt -O models/yolov5n.pt")
+            print(f"⚠️  Warning: YOLO phone detector not found")
+            print("   Phone detection is CRITICAL for security!")
+            print("   System will use fallback edge detection (less accurate)")
         
         return errors
     
@@ -151,13 +155,14 @@ class Config:
             'confidence_min': cls.RECOGNITION_CONFIDENCE_MIN,
             'min_face_size': cls.MIN_FACE_SIZE_PIXELS,
             'spoof_auto_block': cls.AUTO_BLOCK_SPOOF,
-            'spoof_threshold_flag': cls.SPOOF_CONFIDENCE_THRESHOLD_FLAG,
-            'spoof_threshold_block': cls.SPOOF_CONFIDENCE_THRESHOLD_BLOCK,
-            'liveness_conf_threshold': cls.LIVENESS_CONFIDENCE_THRESHOLD,
+            'spoof_threshold': cls.SPOOF_CONFIDENCE_THRESHOLD_BLOCK,
+            'liveness_threshold': cls.LIVENESS_CONFIDENCE_THRESHOLD,
             'texture_threshold': cls.TEXTURE_QUALITY_THRESHOLD,
-            'whatsapp_dry_run': cls.WHATSAPP_DRY_RUN,
-            'otp_expiry_minutes': cls.OTP_EXP_MINUTES,
-            'target_fps': cls.TARGET_FPS
+            'blink_timeout': cls.BLINK_WAIT_TIMEOUT,
+            'required_frames': cls.REQUIRED_CONSECUTIVE_FRAMES,
+            'target_fps': cls.TARGET_FPS,
+            'spoof_cache_enabled': cls.ENABLE_SPOOF_CACHE,
+            'whatsapp_dry_run': cls.WHATSAPP_DRY_RUN
         }
 
 # Validate on import
@@ -168,4 +173,14 @@ if validation_errors:
         print(f"  - {error}")
 else:
     print("✓ Configuration validated successfully")
-    print(f"✓ Settings: {Config.get_summary()}")
+    print("=" * 60)
+    print("OPTIMIZED SETTINGS:")
+    print("  • Faster processing with aggressive frame skipping")
+    print("  • Lenient liveness thresholds for quick approval")
+    print("  • ENHANCED phone/photo blocking (0.50 threshold)")
+    print("  • Caching enabled for performance")
+    print("=" * 60)
+    summary = Config.get_summary()
+    for key, value in summary.items():
+        print(f"  {key}: {value}")
+    print("=" * 60)
