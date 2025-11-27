@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Attendance - Student Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* --- CSS Variables --- */
+        :root {
+            --color-bg: #101010;
+            --color-surface: #181818;
+            --color-border: #2A2A2A;
+            --color-accent: #00E0F0;
+            --color-accent-glow: rgba(0, 224, 240, 0.2);
+            --color-accent-strong-glow: rgba(0, 224, 240, 0.4);
+            --color-status-green: #16A34A;
+            --color-status-red: #FF4545;
+            --color-gold: #FFD700;
+            --color-silver: #C0C0C0;
+            --color-bronze: #CD7F32;
+            --color-text-primary: #EFEFEF;
+            --color-text-secondary: #AAAAAA;
+            --font-heading: 'Montserrat', sans-serif;
+            --font-body: 'Montserrat', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        /* --- Global Styles --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #050505 100%);
+            color: var(--color-text-primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+            opacity: 0.3;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-100px) translateX(100px); }
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-heading);
+            font-weight: 600;
+        }
+
+        /* --- Header --- */
+        .main-header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background-image: linear-gradient(to bottom, 
+                rgba(16, 16, 16, 1) 0%,
+                rgba(16, 16, 16, 0.7) 60%,
+                transparent 100%
+            );
+        }
+
+        .logo-title {
+            font-size: 24px;
+            color: var(--color-text-primary);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* --- Button Styles --- */
+        .btn {
+            font-family: var(--font-body);
+            font-weight: 500;
+            font-size: 14px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background-color: rgba(24, 24, 24, 0.5);
+            color: var(--color-text-secondary);
+            border: 1px solid rgba(0, 224, 240, 0.2);
+        }
+        .btn-secondary:hover {
+            color: var(--color-text-primary);
+            border-color: var(--color-accent);
+            box-shadow: 0 0 15px var(--color-accent-glow);
+        }
+
+        /* --- Main Container --- */
+        .dashboard-container {
+            position: relative;
+            z-index: 1;
+            padding: 30px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* --- Card Styles --- */
+        .card {
+            background: rgba(24, 24, 24, 0.5);
+            backdrop-filter: blur(25px);
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: none;
+            transition: box-shadow 0.3s ease;
+            margin-bottom: 24px;
+        }
+        .card:hover {
+            box-shadow: 0 0 30px var(--color-accent-strong-glow);
+        }
+
+        /* --- Profile Card with Photo --- */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-accent), #00c8d8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: #000;
+            font-weight: 700;
+            overflow: hidden;
+            position: relative;
+           
+            box-shadow: 0 0 20px var(--color-accent-glow);
+        }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .profile-avatar-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .profile-info h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: var(--color-text-primary);
+        }
+
+        .profile-info p {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .profile-info .points {
+            color: var(--color-accent);
+            font-weight: 700;
+        }
+
+        /* --- Stats Grid --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stats-card {
+            background: rgba(24, 24, 24, 0.5);
+            backdrop-filter: blur(25px);
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: none;
+            transition: box-shadow 0.3s ease;
+        }
+        .stats-card:hover {
+            box-shadow: 0 0 30px var(--color-accent-strong-glow);
+        }
+
+        .card-icon {
+            font-size: 20px;
+            color: var(--color-accent);
+            position: absolute;
+            top: 24px;
+            right: 24px;
+        }
+
+        .stats-value {
+            font-family: var(--font-heading);
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .stats-label {
+            font-size: 16px;
+            color: var(--color-text-secondary);
+        }
+
+        /* --- Main Grid --- */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(0, 224, 240, 0.2);
+        }
+
+        .card-header h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+        }
+
+        .card-header i {
+            color: var(--color-accent);
+        }
+
+        .card-header .subtitle {
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            font-weight: 400;
+        }
+
+        /* --- Chart --- */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* --- Calendar --- */
+        .attendance-calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid rgba(0, 224, 240, 0.2);
+            color: var(--color-text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .calendar-day.present {
+            background: rgba(22, 163, 74, 0.2);
+            border-color: var(--color-status-green);
+            color: var(--color-text-primary);
+        }
+
+        .calendar-day.absent {
+            background: rgba(255, 69, 69, 0.2);
+            border-color: var(--color-status-red);
+            color: var(--color-text-primary);
+        }
+
+        .calendar-day.today {
+            border: 2px solid var(--color-accent);
+            box-shadow: 0 0 15px var(--color-accent-glow);
+            color: var(--color-accent);
+        }
+
+        /* --- Leaderboard Styles --- */
+        .leaderboard-list {
+            list-style: none;
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: hidden; /* FIXED: Prevent horizontal scrolling */
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 224, 240, 0.1);
+            transition: all 0.3s ease;
+            min-width: 0; /* FIXED: Prevent overflow */
+        }
+
+        .leaderboard-item:hover {
+            border-color: var(--color-accent);
+            background: rgba(0, 224, 240, 0.05);
+            /* transform: scale(1.02); CHANGED: Scale instead of translateX */
+        }
+
+        .leaderboard-item.current-user {
+            border: 2px solid var(--color-accent);
+            background: rgba(0, 224, 240, 0.1);
+            box-shadow: 0 0 20px var(--color-accent-glow);
+        }
+
+        /* NEW: Profile Picture Container with Medal */
+        .leaderboard-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 16px;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid rgba(0, 224, 240, 0.3);
+            background: linear-gradient(135deg, var(--color-accent), #00c8d8);
+        }
+
+        .leaderboard-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .leaderboard-avatar-text {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #000;
+        }
+
+        /* Medal Overlay on Avatar */
+        .medal-overlay {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 2;
+            border: 2px solid var(--color-bg);
+        }
+
+        .medal-overlay.gold {
+            background: var(--color-gold);
+        }
+
+        .medal-overlay.silver {
+            background: var(--color-silver);
+        }
+
+        .medal-overlay.bronze {
+            background: var(--color-bronze);
+        }
+
+        .rank-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 16px;
+            flex-shrink: 0;
+        }
+
+        .rank-badge.rank-1 {
+            background: linear-gradient(135deg, var(--color-gold), #FFA500);
+            color: #000;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .rank-badge.rank-2 {
+            background: linear-gradient(135deg, var(--color-silver), #A8A8A8);
+            color: #000;
+            box-shadow: 0 0 20px rgba(192, 192, 192, 0.5);
+        }
+
+        .rank-badge.rank-3 {
+            background: linear-gradient(135deg, var(--color-bronze), #8B4513);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(205, 127, 50, 0.5);
+        }
+
+        .rank-badge.rank-other {
+            background: rgba(24, 24, 24, 0.7);
+            border: 1px solid rgba(0, 224, 240, 0.3);
+            color: var(--color-text-secondary);
+        }
+
+        .leaderboard-info {
+            flex: 1;
+            min-width: 0; /* FIXED: Allow text truncation */
+        }
+
+        .leaderboard-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+            white-space: nowrap; /* FIXED: Prevent text wrapping */
+            overflow: hidden; /* FIXED: Hide overflow text */
+            text-overflow: ellipsis; /* FIXED: Add ... for long names */
+        }
+
+        .leaderboard-stats {
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            white-space: nowrap; /* FIXED: Prevent wrapping */
+        }
+
+        .leaderboard-rate {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--color-accent);
+            margin-left: 16px;
+            padding-left: 16px;
+            flex-shrink: 0; /* FIXED: Keep rate visible */
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-header {
+                flex-direction: column;
+                gap: 16px;
+                padding: 20px;
+            }
+
+            .dashboard-container {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .user-profile {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 500px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+
+    <header class="main-header">
+        <h1 class="logo-title">MY ATTENDANCE</h1>
+        <div class="header-controls">
+            <button class="btn btn-secondary" id="logoutBtn">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <div class="card user-profile">
+            <div class="profile-avatar" id="profileAvatar">
+                <span class="profile-avatar-text">...</span>
+            </div>
+            <div class="profile-info">
+                <h2 id="studentName">Loading...</h2>
+                <p>Student ID: <span id="studentId">---</span> | Class: <span id="studentClass">---</span></p>
+                <p>Points Earned: <span class="points" id="studentPoints">0</span></p>
+            </div>
+        </div>
+
+        <section class="stats-grid">
+            <div class="stats-card">
+                <i class="fa-solid fa-calendar-check card-icon"></i>
+                <span class="stats-value" id="daysPresent">0</span>
+                <span class="stats-label">Days Present</span>
+            </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-calendar-times card-icon"></i>
+                <span class="stats-value" id="daysAbsent">0</span>
+                <span class="stats-label">Days Absent</span>
+            </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-chart-line card-icon"></i>
+                <span class="stats-value" id="attendancePercentage">0%</span>
+                <span class="stats-label">Attendance Rate</span>
+            </div>
+            <div class="stats-card">
+                <i class="fa-solid fa-fire card-icon"></i>
+                <span class="stats-value" id="currentStreak">0</span>
+                <span class="stats-label">Current Streak</span>
+            </div>
+        </section>
+
+        <div class="main-grid">
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-chart-bar"></i> Attendance Trend</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="attendanceChart"></canvas>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-calendar-alt"></i> This Month</h2>
+                </div>
+                <div class="attendance-calendar" id="calendar"></div>
+            </section>
+        </div>
+
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <h2><i class="fa-solid fa-trophy"></i> Class Leaderboard</h2>
+                    <p class="subtitle" id="classInfo">Loading...</p>
+                </div>
+            </div>
+            <ul class="leaderboard-list" id="leaderboardList">
+                <li style="text-align: center; color: var(--color-text-secondary); padding: 20px;">Loading...</li>
+            </ul>
+        </section>
+    </main>
+
+    <script>
+        // Generate animated particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 20 + 's';
+            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+            particlesContainer.appendChild(particle);
+        }
+
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token || !user.student_id) {
+            window.location.href = '/login';
+        }
+        
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        });
+        
+        // Load student data
+        async function loadStudentData() {
+            try {
+                if (!user || !user.student_id) {
+                    console.error('No student ID found in local storage.');
+                    window.location.href = '/login';
+                    return;
+                }
+
+                const studentResponse = await fetch(`/api/student-profile/${user.student_id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!studentResponse.ok) throw new Error('Failed to fetch student profile');
+                const studentData = await studentResponse.json();
+                
+                if (studentData.success) {
+                    const student = studentData.student;
+                    document.getElementById('studentName').textContent = student.name;
+                    document.getElementById('studentId').textContent = student.student_id;
+                    document.getElementById('studentClass').textContent = `${student.class}-${student.section}`;
+                    document.getElementById('studentPoints').textContent = student.points || 0;
+                    
+                    // Display photo if available, otherwise show initials
+                    const avatarEl = document.getElementById('profileAvatar');
+                    const avatarText = avatarEl.querySelector('.profile-avatar-text');
+                    
+                    if (student.image_path) {
+                        const img = document.createElement('img');
+                        img.src = '/' + student.image_path;
+                        img.alt = student.name;
+                        img.onerror = function() {
+                            console.warn('Failed to load image, showing initials');
+                            avatarText.textContent = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                        };
+                        avatarEl.appendChild(img);
+                        avatarText.style.display = 'none';
+                    } else {
+                        if (student.name) {
+                            const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                            avatarText.textContent = initials;
+                        }
+                    }
+                }
+                
+                const statsResponse = await fetch(`/api/student-stats/${user.student_id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!statsResponse.ok) throw new Error('Failed to fetch student stats');
+                const statsData = await statsResponse.json();
+                
+                if (statsData.success) {
+                    document.getElementById('daysPresent').textContent = statsData.days_present;
+                    document.getElementById('daysAbsent').textContent = statsData.days_absent;
+                    document.getElementById('attendancePercentage').textContent = statsData.attendance_rate + '%';
+                    document.getElementById('currentStreak').textContent = statsData.streak || 0;
+                }
+                
+                await loadCalendar();
+                await loadChart();
+                await loadClassLeaderboard();
+                
+            } catch (error) {
+                console.error('Error loading student data:', error);
+            }
+        }
+        
+        async function loadClassLeaderboard() {
+            const response = await fetch('/api/class-leaderboard', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                console.error('Failed to load leaderboard');
+                return;
+            }
+            
+            const data = await response.json();
+            const listEl = document.getElementById('leaderboardList');
+            listEl.innerHTML = '';
+            
+            if (data.success && data.leaderboard && data.leaderboard.length > 0) {
+                document.getElementById('classInfo').textContent = `Class ${data.class}`;
+                
+                data.leaderboard.forEach(student => {
+                    const item = document.createElement('li');
+                    item.className = 'leaderboard-item';
+                    if (student.is_current_user) {
+                        item.classList.add('current-user');
+                    }
+                    
+                    let rankClass = 'rank-other';
+                    let rankIcon = student.rank;
+                    let medalHtml = '';
+                    
+                    if (student.rank === 1) {
+                        rankClass = 'rank-1';
+                        rankIcon = '🥇';
+                        medalHtml = '<div class="medal-overlay gold">🥇</div>';
+                    } else if (student.rank === 2) {
+                        rankClass = 'rank-2';
+                        rankIcon = '🥈';
+                        medalHtml = '<div class="medal-overlay silver">🥈</div>';
+                    } else if (student.rank === 3) {
+                        rankClass = 'rank-3';
+                        rankIcon = '🥉';
+                        medalHtml = '<div class="medal-overlay bronze">🥉</div>';
+                    }
+                    
+                    // Generate initials for fallback
+                    const initials = student.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                    
+                    // Profile picture HTML
+                    let avatarContent = '';
+                    if (student.image_path) {
+                        avatarContent = `<img src="/${student.image_path}" alt="${student.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="leaderboard-avatar-text" style="display: none;">${initials}</div>`;
+                    } else {
+                        avatarContent = `<div class="leaderboard-avatar-text">${initials}</div>`;
+                    }
+                    
+                    item.innerHTML = `
+                      
+                        <div class="leaderboard-avatar">
+                            ${avatarContent}
+                            ${medalHtml}
+                        </div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${student.name}${student.is_current_user ? ' (You)' : ''}</div>
+                            <div class="leaderboard-stats">${student.days_present}/${student.total_days} days • ${student.points} points</div>
+                        </div>
+                        <div class="leaderboard-rate">${student.attendance_rate}%</div>
+                    `;
+                    listEl.appendChild(item);
+                });
+            } else {
+                listEl.innerHTML = '<li style="text-align: center; color: var(--color-text-secondary); padding: 20px;">No classmates found</li>';
+            }
+        }
+        
+        async function loadCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            const today = new Date();
+            const month = today.getMonth() + 1;
+            const year = today.getFullYear();
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            try {
+                const response = await fetch(`/api/student-attendance-month/${user.student_id}?month=${month}&year=${year}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load calendar data');
+                }
+
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load calendar data');
+                }
+
+                const presentDates = new Set(data.present_dates || []);
+                const absentDates = new Set(data.absent_dates || []);
+
+                calendarEl.innerHTML = '';
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayEl = document.createElement('div');
+                    dayEl.className = 'calendar-day';
+                    dayEl.textContent = day;
+
+                    if (presentDates.has(dateStr)) {
+                        dayEl.classList.add('present');
+                    } else if (absentDates.has(dateStr)) {
+                        dayEl.classList.add('absent');
+                    }
+
+                    if (day === today.getDate()) {
+                        dayEl.classList.add('today');
+                    }
+
+                    calendarEl.appendChild(dayEl);
+                }
+            } catch (error) {
+                console.error('Failed to load calendar data', error);
+                calendarEl.innerHTML = '<p style="color: var(--color-text-secondary); font-size: 14px;">Unable to load calendar.</p>';
+            }
+        }
+        
+        async function loadChart() {
+            const response = await fetch(`/api/student-trend/${user.student_id}?days=30`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (!response.ok) {
+                 console.error('Failed to load chart data');
+                 return;
+            }
+            const data = await response.json();
+            
+            if (data.success) {
+                const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Attendance Rate',
+                            data: data.values,
+                            borderColor: '#00E0F0',
+                            backgroundColor: 'rgba(0, 224, 240, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    color: '#AAAAAA',
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(0, 224, 240, 0.1)'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#AAAAAA'
+                                },
+                                grid: {
+                                    color: 'rgba(0, 224, 240, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        loadStudentData();
+    </script>
+</body>
+</html>
